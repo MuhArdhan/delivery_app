@@ -13,6 +13,7 @@ from delivery_app.services.fleet_monitoring import (
 	compute_trip_monitoring_status,
 	format_point_geojson,
 	get_trip_scan_history,
+	is_valid_coord_pair,
 	parse_geolocation,
 )
 
@@ -332,12 +333,12 @@ def get_operations_summary():
 			companies_seen.add(trip.company)
 			orig_lat = _clean_coord(trip.get("custom_origin_latitude"))
 			orig_lng = _clean_coord(trip.get("custom_origin_longitude"))
-			if orig_lat is None or orig_lng is None:
+			if not is_valid_coord_pair(orig_lat, orig_lng):
 				comp_coords = frappe.db.get_value("Company", trip.company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 				orig_lat = _clean_coord(comp_coords.get("custom_latitude"))
 				orig_lng = _clean_coord(comp_coords.get("custom_longitude"))
 
-			if orig_lat is not None and orig_lng is not None:
+			if is_valid_coord_pair(orig_lat, orig_lng):
 				map_markers.append({
 					"id": f"ORIGIN-{trip.company}",
 					"type": "origin",
@@ -363,13 +364,13 @@ def get_operations_summary():
 		for s in stops:
 			s_lat = _clean_coord(s.get("lat"))
 			s_lng = _clean_coord(s.get("lng"))
-			if s_lat is None or s_lng is None:
+			if not is_valid_coord_pair(s_lat, s_lng):
 				if s.get("customer"):
 					c_coords = frappe.db.get_value("Customer", s["customer"], ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 					s_lat = _clean_coord(c_coords.get("custom_latitude"))
 					s_lng = _clean_coord(c_coords.get("custom_longitude"))
 
-			if s_lat is not None and s_lng is not None:
+			if is_valid_coord_pair(s_lat, s_lng):
 				map_markers.append({
 					"id": s.get("delivery_note") or f"{trip.name}-stop-{s.get('idx')}",
 					"type": "stop",
@@ -403,7 +404,7 @@ def get_operations_summary():
 		c_coords = frappe.db.get_value("Customer", note["customer"], ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 		c_lat = _clean_coord(c_coords.get("custom_latitude"))
 		c_lng = _clean_coord(c_coords.get("custom_longitude"))
-		if c_lat is not None and c_lng is not None:
+		if is_valid_coord_pair(c_lat, c_lng):
 			map_markers.append({
 				"id": note["name"],
 				"type": "note",
@@ -959,7 +960,7 @@ def get_delivery_trips_list(status_filter=None, company_filter=None, search=None
 		for s in stops:
 			s_lat = _clean_coord(s.get("lat"))
 			s_lng = _clean_coord(s.get("lng"))
-			if s_lat is None or s_lng is None:
+			if not is_valid_coord_pair(s_lat, s_lng):
 				unlocated_stops += 1
 
 			if s["visited"]:
@@ -1021,15 +1022,15 @@ def get_delivery_trip_detail(trip_name: str):
 	# Origin location
 	orig_lat = _clean_coord(trip.get("custom_origin_latitude"))
 	orig_lng = _clean_coord(trip.get("custom_origin_longitude"))
-	if orig_lat is None or orig_lng is None:
+	if not is_valid_coord_pair(orig_lat, orig_lng):
 		if trip.company:
 			comp_coords = frappe.db.get_value("Company", trip.company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 			orig_lat = _clean_coord(comp_coords.get("custom_latitude"))
 			orig_lng = _clean_coord(comp_coords.get("custom_longitude"))
 
-	trip_data["origin_lat"] = orig_lat
-	trip_data["origin_lng"] = orig_lng
-	trip_data["has_origin_coordinates"] = bool(orig_lat is not None and orig_lng is not None)
+	trip_data["origin_lat"] = orig_lat if is_valid_coord_pair(orig_lat, orig_lng) else None
+	trip_data["origin_lng"] = orig_lng if is_valid_coord_pair(orig_lat, orig_lng) else None
+	trip_data["has_origin_coordinates"] = is_valid_coord_pair(orig_lat, orig_lng)
 
 	# Scan history
 	dn_names = [stop.delivery_note for stop in trip.delivery_stops if stop.delivery_note]
@@ -1045,15 +1046,16 @@ def get_delivery_trip_detail(trip_name: str):
 		# Check coordinates
 		stop_lat = _clean_coord(stop.lat)
 		stop_lng = _clean_coord(stop.lng)
-		if stop_lat is None or stop_lng is None:
+		if not is_valid_coord_pair(stop_lat, stop_lng):
 			if stop.customer:
 				c_coords = frappe.db.get_value("Customer", stop.customer, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 				stop_lat = _clean_coord(c_coords.get("custom_latitude"))
 				stop_lng = _clean_coord(c_coords.get("custom_longitude"))
 
-		stop_dict["lat"] = stop_lat
-		stop_dict["lng"] = stop_lng
-		stop_dict["has_coordinates"] = bool(stop_lat is not None and stop_lng is not None)
+		has_coords = is_valid_coord_pair(stop_lat, stop_lng)
+		stop_dict["lat"] = stop_lat if has_coords else None
+		stop_dict["lng"] = stop_lng if has_coords else None
+		stop_dict["has_coordinates"] = has_coords
 
 		# Visit & Confirmation status
 		is_visited = bool(stop.visited)
@@ -1215,13 +1217,14 @@ def get_fleet_resources():
 	for c in companies_raw:
 		c_lat = _clean_coord(c.get("custom_latitude"))
 		c_lng = _clean_coord(c.get("custom_longitude"))
+		has_loc = is_valid_coord_pair(c_lat, c_lng)
 		companies.append({
 			"name": c.name,
 			"company_name": c.company_name,
 			"abbr": c.abbr,
-			"has_dispatch_location": bool(c_lat is not None and c_lng is not None),
-			"dispatch_lat": c_lat,
-			"dispatch_lng": c_lng,
+			"has_dispatch_location": has_loc,
+			"dispatch_lat": c_lat if has_loc else None,
+			"dispatch_lng": c_lng if has_loc else None,
 		})
 
 	default_company = frappe.db.get_single_value("Global Defaults", "default_company")
@@ -1243,6 +1246,7 @@ def get_customer_delivery_location(customer: str):
 	c_data = frappe.db.get_value("Customer", customer, ["custom_latitude", "custom_longitude", "customer_primary_address"], as_dict=True) or {}
 	lat = _clean_coord(c_data.get("custom_latitude"))
 	lng = _clean_coord(c_data.get("custom_longitude"))
+	has_loc = is_valid_coord_pair(lat, lng)
 	primary_addr = c_data.get("customer_primary_address")
 	address_display = ""
 	if primary_addr:
@@ -1251,9 +1255,9 @@ def get_customer_delivery_location(customer: str):
 
 	return {
 		"customer": customer,
-		"latitude": lat,
-		"longitude": lng,
-		"has_location": bool(lat is not None and lng is not None),
+		"latitude": lat if has_loc else None,
+		"longitude": lng if has_loc else None,
+		"has_location": has_loc,
 		"address_display": address_display
 	}
 
@@ -1291,11 +1295,12 @@ def get_company_dispatch_location(company: str):
 	c_data = frappe.db.get_value("Company", company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 	lat = _clean_coord(c_data.get("custom_latitude"))
 	lng = _clean_coord(c_data.get("custom_longitude"))
+	has_loc = is_valid_coord_pair(lat, lng)
 	return {
 		"company": company,
-		"latitude": lat,
-		"longitude": lng,
-		"has_location": bool(lat is not None and lng is not None)
+		"latitude": lat if has_loc else None,
+		"longitude": lng if has_loc else None,
+		"has_location": has_loc
 	}
 
 

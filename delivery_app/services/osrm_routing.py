@@ -8,7 +8,7 @@ import urllib.error
 from typing import Any, Dict, List, Optional, Tuple
 import frappe
 from frappe import _
-from delivery_app.services.fleet_monitoring import _clean_coord
+from delivery_app.services.fleet_monitoring import _clean_coord, is_valid_coord_pair
 
 DEFAULT_OSRM_URL = "https://router.project-osrm.org"
 ROUTE_CACHE_EXPIRY = 86400  # 24 hours in seconds
@@ -55,7 +55,7 @@ def calculate_osrm_route(points: List[Tuple[float, float]], profile: str = "driv
 		if p and len(p) >= 2:
 			lat = _clean_coord(p[0])
 			lng = _clean_coord(p[1])
-			if lat is not None and lng is not None:
+			if is_valid_coord_pair(lat, lng):
 				valid_points.append((lat, lng))
 
 	if len(valid_points) < 2:
@@ -168,27 +168,27 @@ def get_trip_osrm_route(trip_name: str) -> Dict[str, Any]:
 	# 1. Origin coordinates
 	orig_lat = _clean_coord(trip.get("custom_origin_latitude"))
 	orig_lng = _clean_coord(trip.get("custom_origin_longitude"))
-	if orig_lat is None or orig_lng is None:
+	if not is_valid_coord_pair(orig_lat, orig_lng):
 		if trip.company:
 			comp_coords = frappe.db.get_value("Company", trip.company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 			orig_lat = _clean_coord(comp_coords.get("custom_latitude"))
 			orig_lng = _clean_coord(comp_coords.get("custom_longitude"))
 
 	points = []
-	if orig_lat is not None and orig_lng is not None:
+	if is_valid_coord_pair(orig_lat, orig_lng):
 		points.append((orig_lat, orig_lng))
 
 	# 2. Stops in plan sequence
 	for stop in trip.delivery_stops:
 		s_lat = _clean_coord(stop.lat)
 		s_lng = _clean_coord(stop.lng)
-		if s_lat is None or s_lng is None:
+		if not is_valid_coord_pair(s_lat, s_lng):
 			if stop.customer:
 				cust_coords = frappe.db.get_value("Customer", stop.customer, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 				s_lat = _clean_coord(cust_coords.get("custom_latitude"))
 				s_lng = _clean_coord(cust_coords.get("custom_longitude"))
 
-		if s_lat is not None and s_lng is not None:
+		if is_valid_coord_pair(s_lat, s_lng):
 			points.append((s_lat, s_lng))
 
 	if len(points) < 2:
@@ -197,8 +197,8 @@ def get_trip_osrm_route(trip_name: str) -> Dict[str, Any]:
 			"route_points": [],
 			"distance_km": 0.0,
 			"duration_min": 0.0,
-			"has_origin": bool(orig_lat is not None and orig_lng is not None),
-			"stops_located": len(points) - (1 if orig_lat is not None else 0),
+			"has_origin": bool(is_valid_coord_pair(orig_lat, orig_lng)),
+			"stops_located": len(points) - (1 if is_valid_coord_pair(orig_lat, orig_lng) else 0),
 			"total_stops": len(trip.delivery_stops),
 			"message": _("Rute membutuhkan titik asal dan minimal satu titik tujuan.")
 		}

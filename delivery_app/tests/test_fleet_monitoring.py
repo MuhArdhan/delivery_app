@@ -15,6 +15,7 @@ from delivery_app.services.fleet_monitoring import (
 	compute_trip_monitoring_status,
 	format_point_geojson,
 	get_trip_scan_history,
+	is_valid_coord_pair,
 	parse_geolocation,
 )
 
@@ -35,6 +36,14 @@ class TestFleetMonitoring(unittest.TestCase):
 		self.assertIsNone(_clean_coord(""))
 		self.assertIsNone(_clean_coord("invalid"))
 		self.assertIsNone(_clean_coord(200.0))  # Out of geographic range
+
+	def test_is_valid_coord_pair(self):
+		self.assertTrue(is_valid_coord_pair(-7.6147, 110.6869))
+		self.assertTrue(is_valid_coord_pair(0.0, 110.0))  # Equator Pontianak
+		self.assertFalse(is_valid_coord_pair(0.0, 0.0))    # Null Island placeholder
+		self.assertFalse(is_valid_coord_pair(None, 110.0))
+		self.assertFalse(is_valid_coord_pair(-7.6147, None))
+		self.assertFalse(is_valid_coord_pair("", ""))
 
 	def test_parse_geolocation_formats(self):
 		# 1. FeatureCollection (Standard Frappe Geolocation)

@@ -22,6 +22,20 @@ def _clean_coord(val: Any) -> Optional[float]:
 	return None
 
 
+def is_valid_coord_pair(lat: Any, lng: Any) -> bool:
+	"""
+	Check if a (latitude, longitude) pair is valid and non-placeholder.
+	Rejects None, out-of-range, and (0.0, 0.0) placeholder defaults.
+	"""
+	c_lat = _clean_coord(lat)
+	c_lng = _clean_coord(lng)
+	if c_lat is None or c_lng is None:
+		return False
+	if abs(c_lat) < 1e-6 and abs(c_lng) < 1e-6:
+		return False
+	return True
+
+
 def parse_geolocation(value: Any) -> Tuple[Optional[float], Optional[float]]:
 	"""
 	Extract (latitude, longitude) as floats from Frappe Geolocation field.

@@ -141,14 +141,16 @@ onMounted(() => {
 
   map = L.map(mapContainer.value, {
     zoomControl: false,
-    attributionControl: false
+    attributionControl: true
   }).setView([-6.2000, 106.8166], 11)
 
   L.control.zoom({ position: 'bottomright' }).addTo(map)
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  // Public OSM tiles: no bulk downloads or offline prefetching.
+  // Usage policy: https://operations.osmfoundation.org/policies/tiles/
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    subdomains: 'abcd',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map)
 
   renderMarkers()

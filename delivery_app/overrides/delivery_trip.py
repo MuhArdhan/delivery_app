@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from delivery_app.services.fleet_monitoring import parse_geolocation
+from delivery_app.services.fleet_monitoring import _clean_coord, parse_geolocation
 
 
 def validate_delivery_trip(doc, method=None):
@@ -66,20 +66,26 @@ def validate_delivery_trip(doc, method=None):
 				title=_("Company Mismatch")
 			)
 
-	# 3. Snapshot Company dispatch origin location if missing
-	if doc.company and not doc.get("custom_origin_location"):
-		comp_loc = frappe.db.get_value("Company", doc.company, "custom_dispatch_location")
-		if comp_loc:
-			doc.custom_origin_location = comp_loc
+	# 3. Snapshot Company dispatch origin coordinates if missing
+	if doc.company:
+		orig_lat = _clean_coord(doc.get("custom_origin_latitude"))
+		orig_lng = _clean_coord(doc.get("custom_origin_longitude"))
+		if orig_lat is None or orig_lng is None:
+			comp_coords = frappe.db.get_value("Company", doc.company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+			c_lat = _clean_coord(comp_coords.get("custom_latitude"))
+			c_lng = _clean_coord(comp_coords.get("custom_longitude"))
+			if c_lat is not None and c_lng is not None:
+				doc.custom_origin_latitude = c_lat
+				doc.custom_origin_longitude = c_lng
 
-	# 4. Snapshot Customer delivery coordinates to Delivery Stop if empty
+	# 4. Snapshot Customer coordinates to Delivery Stop if empty
 	for stop in doc.delivery_stops:
 		stop_has_coords = (stop.lat is not None and stop.lng is not None and (stop.lat != 0.0 or stop.lng != 0.0))
 		if not stop_has_coords and stop.customer:
-			cust_loc = frappe.db.get_value("Customer", stop.customer, "custom_delivery_location")
-			if cust_loc:
-				lat, lng = parse_geolocation(cust_loc)
-				if lat is not None and lng is not None:
-					stop.lat = lat
-					stop.lng = lng
+			cust_coords = frappe.db.get_value("Customer", stop.customer, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+			c_lat = _clean_coord(cust_coords.get("custom_latitude"))
+			c_lng = _clean_coord(cust_coords.get("custom_longitude"))
+			if c_lat is not None and c_lng is not None:
+				stop.lat = c_lat
+				stop.lng = c_lng
 

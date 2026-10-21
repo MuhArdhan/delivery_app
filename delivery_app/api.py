@@ -317,7 +317,8 @@ def get_operations_summary():
 
 	# A. Active Trips & Stops
 	active_trips = frappe.db.sql("""
-		SELECT dt.name, dt.company, dt.driver_name, dt.vehicle, dt.status, dt.custom_origin_location
+		SELECT dt.name, dt.company, dt.driver_name, dt.vehicle, dt.status,
+		       dt.custom_origin_latitude, dt.custom_origin_longitude
 		FROM `tabDelivery Trip` dt
 		WHERE dt.docstatus IN (0, 1)
 		AND dt.status IN ('Scheduled', 'In Transit')
@@ -329,10 +330,12 @@ def get_operations_summary():
 		# Company dispatch origin
 		if trip.company and trip.company not in companies_seen:
 			companies_seen.add(trip.company)
-			orig_lat, orig_lng = parse_geolocation(trip.get("custom_origin_location"))
+			orig_lat = _clean_coord(trip.get("custom_origin_latitude"))
+			orig_lng = _clean_coord(trip.get("custom_origin_longitude"))
 			if orig_lat is None or orig_lng is None:
-				comp_loc = frappe.db.get_value("Company", trip.company, "custom_dispatch_location")
-				orig_lat, orig_lng = parse_geolocation(comp_loc)
+				comp_coords = frappe.db.get_value("Company", trip.company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+				orig_lat = _clean_coord(comp_coords.get("custom_latitude"))
+				orig_lng = _clean_coord(comp_coords.get("custom_longitude"))
 
 			if orig_lat is not None and orig_lng is not None:
 				map_markers.append({
@@ -362,11 +365,9 @@ def get_operations_summary():
 			s_lng = _clean_coord(s.get("lng"))
 			if s_lat is None or s_lng is None:
 				if s.get("customer"):
-					c_loc = frappe.db.get_value("Customer", s["customer"], "custom_delivery_location")
-					c_lat, c_lng = parse_geolocation(c_loc)
-					if c_lat is not None and c_lng is not None:
-						s_lat = c_lat
-						s_lng = c_lng
+					c_coords = frappe.db.get_value("Customer", s["customer"], ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+					s_lat = _clean_coord(c_coords.get("custom_latitude"))
+					s_lng = _clean_coord(c_coords.get("custom_longitude"))
 
 			if s_lat is not None and s_lng is not None:
 				map_markers.append({
@@ -399,8 +400,9 @@ def get_operations_summary():
 	""", as_dict=True)
 
 	for note in unassigned_notes:
-		c_loc = frappe.db.get_value("Customer", note["customer"], "custom_delivery_location")
-		c_lat, c_lng = parse_geolocation(c_loc)
+		c_coords = frappe.db.get_value("Customer", note["customer"], ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+		c_lat = _clean_coord(c_coords.get("custom_latitude"))
+		c_lng = _clean_coord(c_coords.get("custom_longitude"))
 		if c_lat is not None and c_lng is not None:
 			map_markers.append({
 				"id": note["name"],
@@ -727,11 +729,14 @@ def create_delivery_trip(driver: str, vehicle: str, departure_time: str = None, 
 	trip.departure_time = departure_time or now_datetime()
 	trip.status = "Draft"
 
-	# Snapshot Company dispatch location as trip origin
+	# Snapshot Company dispatch origin coordinates as trip origin
 	if company:
-		comp_loc = frappe.db.get_value("Company", company, "custom_dispatch_location")
-		if comp_loc:
-			trip.custom_origin_location = comp_loc
+		comp_coords = frappe.db.get_value("Company", company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+		c_lat = _clean_coord(comp_coords.get("custom_latitude"))
+		c_lng = _clean_coord(comp_coords.get("custom_longitude"))
+		if c_lat is not None and c_lng is not None:
+			trip.custom_origin_latitude = c_lat
+			trip.custom_origin_longitude = c_lng
 
 	# Add stops
 	for idx, s in enumerate(stops, 1):
@@ -745,11 +750,9 @@ def create_delivery_trip(driver: str, vehicle: str, departure_time: str = None, 
 		stop_lng = _clean_coord(s.get("lng"))
 		if stop_lat is None or stop_lng is None:
 			if customer_name:
-				cust_loc = frappe.db.get_value("Customer", customer_name, "custom_delivery_location")
-				c_lat, c_lng = parse_geolocation(cust_loc)
-				if c_lat is not None and c_lng is not None:
-					stop_lat = c_lat
-					stop_lng = c_lng
+				c_coords = frappe.db.get_value("Customer", customer_name, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+				stop_lat = _clean_coord(c_coords.get("custom_latitude"))
+				stop_lng = _clean_coord(c_coords.get("custom_longitude"))
 
 		stop_row = trip.append("delivery_stops", {})
 		stop_row.customer = customer_name
@@ -924,11 +927,13 @@ def get_delivery_trip_detail(trip_name: str):
 	trip_data = trip.as_dict()
 
 	# Origin location
-	orig_lat, orig_lng = parse_geolocation(trip.get("custom_origin_location"))
+	orig_lat = _clean_coord(trip.get("custom_origin_latitude"))
+	orig_lng = _clean_coord(trip.get("custom_origin_longitude"))
 	if orig_lat is None or orig_lng is None:
 		if trip.company:
-			comp_loc = frappe.db.get_value("Company", trip.company, "custom_dispatch_location")
-			orig_lat, orig_lng = parse_geolocation(comp_loc)
+			comp_coords = frappe.db.get_value("Company", trip.company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+			orig_lat = _clean_coord(comp_coords.get("custom_latitude"))
+			orig_lng = _clean_coord(comp_coords.get("custom_longitude"))
 
 	trip_data["origin_lat"] = orig_lat
 	trip_data["origin_lng"] = orig_lng
@@ -950,11 +955,9 @@ def get_delivery_trip_detail(trip_name: str):
 		stop_lng = _clean_coord(stop.lng)
 		if stop_lat is None or stop_lng is None:
 			if stop.customer:
-				c_loc = frappe.db.get_value("Customer", stop.customer, "custom_delivery_location")
-				c_lat, c_lng = parse_geolocation(c_loc)
-				if c_lat is not None and c_lng is not None:
-					stop_lat = c_lat
-					stop_lng = c_lng
+				c_coords = frappe.db.get_value("Customer", stop.customer, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+				stop_lat = _clean_coord(c_coords.get("custom_latitude"))
+				stop_lng = _clean_coord(c_coords.get("custom_longitude"))
 
 		stop_dict["lat"] = stop_lat
 		stop_dict["lng"] = stop_lng
@@ -1074,10 +1077,11 @@ def get_fleet_resources():
 		order_by="license_plate asc"
 	)
 
-	companies_raw = frappe.get_all("Company", fields=["name", "company_name", "abbr", "custom_dispatch_location"])
+	companies_raw = frappe.get_all("Company", fields=["name", "company_name", "abbr", "custom_latitude", "custom_longitude"])
 	companies = []
 	for c in companies_raw:
-		c_lat, c_lng = parse_geolocation(c.get("custom_dispatch_location"))
+		c_lat = _clean_coord(c.get("custom_latitude"))
+		c_lng = _clean_coord(c.get("custom_longitude"))
 		companies.append({
 			"name": c.name,
 			"company_name": c.company_name,
@@ -1100,12 +1104,13 @@ def get_fleet_resources():
 
 @frappe.whitelist()
 def get_customer_delivery_location(customer: str):
-	"""Get customer coordinates from Customer master."""
+	"""Get customer coordinates from Customer master (custom_latitude, custom_longitude)."""
 	if not customer:
 		frappe.throw(_("Customer is required."))
-	raw_geo = frappe.db.get_value("Customer", customer, "custom_delivery_location")
-	lat, lng = parse_geolocation(raw_geo)
-	primary_addr = frappe.db.get_value("Customer", customer, "customer_primary_address")
+	c_data = frappe.db.get_value("Customer", customer, ["custom_latitude", "custom_longitude", "customer_primary_address"], as_dict=True) or {}
+	lat = _clean_coord(c_data.get("custom_latitude"))
+	lng = _clean_coord(c_data.get("custom_longitude"))
+	primary_addr = c_data.get("customer_primary_address")
 	address_display = ""
 	if primary_addr:
 		addr_dict = frappe.db.get_value("Address", primary_addr, ["address_line1", "city", "pincode"], as_dict=True) or {}
@@ -1122,7 +1127,7 @@ def get_customer_delivery_location(customer: str):
 
 @frappe.whitelist()
 def set_customer_delivery_location(customer: str, latitude: float, longitude: float):
-	"""Set customer coordinates in Customer master."""
+	"""Set customer coordinates in Customer master (custom_latitude, custom_longitude)."""
 	if not customer:
 		frappe.throw(_("Customer is required."))
 	lat = _clean_coord(latitude)
@@ -1130,8 +1135,10 @@ def set_customer_delivery_location(customer: str, latitude: float, longitude: fl
 	if lat is None or lng is None:
 		frappe.throw(_("Koordinat latitude dan longitude tidak valid."))
 
-	geo_str = format_point_geojson(lat, lng)
-	frappe.db.set_value("Customer", customer, "custom_delivery_location", geo_str, update_modified=True)
+	frappe.db.set_value("Customer", customer, {
+		"custom_latitude": lat,
+		"custom_longitude": lng,
+	}, update_modified=True)
 	frappe.db.commit()
 
 	return {
@@ -1145,11 +1152,12 @@ def set_customer_delivery_location(customer: str, latitude: float, longitude: fl
 
 @frappe.whitelist()
 def get_company_dispatch_location(company: str):
-	"""Get dispatch location coordinates from Company master."""
+	"""Get dispatch coordinates from Company master (custom_latitude, custom_longitude)."""
 	if not company:
 		frappe.throw(_("Company is required."))
-	raw_geo = frappe.db.get_value("Company", company, "custom_dispatch_location")
-	lat, lng = parse_geolocation(raw_geo)
+	c_data = frappe.db.get_value("Company", company, ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+	lat = _clean_coord(c_data.get("custom_latitude"))
+	lng = _clean_coord(c_data.get("custom_longitude"))
 	return {
 		"company": company,
 		"latitude": lat,
@@ -1160,7 +1168,7 @@ def get_company_dispatch_location(company: str):
 
 @frappe.whitelist()
 def set_company_dispatch_location(company: str, latitude: float, longitude: float):
-	"""Set dispatch location coordinates in Company master."""
+	"""Set dispatch coordinates in Company master (custom_latitude, custom_longitude)."""
 	if not company:
 		frappe.throw(_("Company is required."))
 	lat = _clean_coord(latitude)
@@ -1168,8 +1176,10 @@ def set_company_dispatch_location(company: str, latitude: float, longitude: floa
 	if lat is None or lng is None:
 		frappe.throw(_("Koordinat latitude dan longitude tidak valid."))
 
-	geo_str = format_point_geojson(lat, lng)
-	frappe.db.set_value("Company", company, "custom_dispatch_location", geo_str, update_modified=True)
+	frappe.db.set_value("Company", company, {
+		"custom_latitude": lat,
+		"custom_longitude": lng,
+	}, update_modified=True)
 	frappe.db.commit()
 
 	return {

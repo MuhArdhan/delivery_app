@@ -124,30 +124,46 @@ CUSTOM_FIELDS = {
 	],
 	"Customer": [
 		{
-			"fieldname": "custom_delivery_location",
-			"label": "Lokasi Pengiriman",
-			"fieldtype": "Geolocation",
+			"fieldname": "custom_latitude",
+			"label": "Latitude",
+			"fieldtype": "Float",
 			"insert_after": "customer_primary_address",
-			"description": "Titik lokasi pengiriman untuk monitoring armada sendiri",
-		}
+		},
+		{
+			"fieldname": "custom_longitude",
+			"label": "Longitude",
+			"fieldtype": "Float",
+			"insert_after": "custom_latitude",
+		},
 	],
 	"Company": [
 		{
-			"fieldname": "custom_dispatch_location",
-			"label": "Lokasi Keberangkatan",
-			"fieldtype": "Geolocation",
+			"fieldname": "custom_latitude",
+			"label": "Latitude",
+			"fieldtype": "Float",
 			"insert_after": "company_name",
-			"description": "Titik lokasi asal keberangkatan armada untuk pengiriman company ini",
-		}
+		},
+		{
+			"fieldname": "custom_longitude",
+			"label": "Longitude",
+			"fieldtype": "Float",
+			"insert_after": "custom_latitude",
+		},
 	],
 	"Delivery Trip": [
 		{
-			"fieldname": "custom_origin_location",
-			"label": "Lokasi Asal",
-			"fieldtype": "Geolocation",
+			"fieldname": "custom_origin_latitude",
+			"label": "Origin Latitude",
+			"fieldtype": "Float",
 			"insert_after": "departure_time",
 			"allow_on_submit": 1,
-			"description": "Snapshot lokasi asal saat trip dibuat",
+		},
+		{
+			"fieldname": "custom_origin_longitude",
+			"label": "Origin Longitude",
+			"fieldtype": "Float",
+			"insert_after": "custom_origin_latitude",
+			"allow_on_submit": 1,
 		},
 		{
 			"fieldname": "custom_actual_departure",
@@ -155,7 +171,7 @@ CUSTOM_FIELDS = {
 			"fieldtype": "Datetime",
 			"read_only": 1,
 			"allow_on_submit": 1,
-			"insert_after": "custom_origin_location",
+			"insert_after": "custom_origin_longitude",
 		},
 		{
 			"fieldname": "custom_departed_by",
@@ -171,6 +187,17 @@ CUSTOM_FIELDS = {
 
 
 def ensure_custom_fields():
+	# Clean up any obsolete geolocation fields if present
+	obsolete = [
+		("Customer", "custom_delivery_location"),
+		("Company", "custom_dispatch_location"),
+		("Delivery Trip", "custom_origin_location"),
+	]
+	for dt, fld in obsolete:
+		cf = frappe.db.get_value("Custom Field", {"dt": dt, "fieldname": fld}, "name")
+		if cf:
+			frappe.delete_doc("Custom Field", cf, ignore_permissions=True)
+
 	create_custom_fields(CUSTOM_FIELDS, update=True)
 	frappe.db.commit()
 

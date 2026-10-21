@@ -20,6 +20,12 @@ from delivery_app.services.fleet_monitoring import (
 
 
 class TestFleetMonitoring(unittest.TestCase):
+	@classmethod
+	def setUpClass(cls):
+		if not frappe.db:
+			frappe.init(site="development.localhost")
+			frappe.connect()
+
 	def test_clean_coord(self):
 		self.assertEqual(_clean_coord(0), 0.0)
 		self.assertEqual(_clean_coord("0.0"), 0.0)
@@ -161,26 +167,25 @@ class TestFleetMonitoring(unittest.TestCase):
 		doc = SimpleNamespace(
 			company="ROPI",
 			delivery_stops=[stop],
-			custom_origin_location=None,
+			custom_origin_latitude=None,
+			custom_origin_longitude=None,
 			get=lambda k: getattr(doc, k, None)
 		)
-
-		comp_geo = format_point_geojson(-7.61, 110.68)
-		cust_geo = format_point_geojson(-7.75, 110.36)
 
 		def mock_get_value(doctype, name, field, **kwargs):
 			if doctype == "Delivery Note" and name == "DN-1":
 				return SimpleNamespace(custom_delivery_method="Armada Sendiri", company="ROPI", customer="Cust 1")
 			if doctype == "Company" and name == "ROPI":
-				return comp_geo
+				return {"custom_latitude": -7.61, "custom_longitude": 110.68}
 			if doctype == "Customer" and name == "Cust 1":
-				return cust_geo
+				return {"custom_latitude": -7.75, "custom_longitude": 110.36}
 			return None
 
 		with patch.object(frappe.db, "get_value", side_effect=mock_get_value):
 			validate_delivery_trip(doc)
 			# Origin snapshot
-			self.assertEqual(doc.custom_origin_location, comp_geo)
+			self.assertAlmostEqual(doc.custom_origin_latitude, -7.61)
+			self.assertAlmostEqual(doc.custom_origin_longitude, 110.68)
 			# Stop coordinate snapshot
 			self.assertAlmostEqual(stop.lat, -7.75)
 			self.assertAlmostEqual(stop.lng, 110.36)

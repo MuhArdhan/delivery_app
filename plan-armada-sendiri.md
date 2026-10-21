@@ -96,9 +96,9 @@ Usulan field:
 
 | Dokumen | Data | Penggunaan |
 | --- | --- | --- |
-| Customer | `custom_delivery_location`, Geolocation dengan satu titik | Pin lokasi pengiriman pelanggan. |
-| Company | `custom_dispatch_location`, Geolocation dengan satu titik | Titik keberangkatan untuk SO milik company tersebut. |
-| Delivery Trip | `custom_origin_location`, snapshot titik company | Menjaga asal rute trip sesuai saat trip disusun. |
+| Customer | `custom_latitude`, `custom_longitude` (Float) | Koordinat Latitude & Longitude pelanggan (alamat/pengiriman). |
+| Company | `custom_latitude`, `custom_longitude` (Float) | Koordinat asal keberangkatan armada untuk company tersebut. |
+| Delivery Trip | `custom_origin_latitude`, `custom_origin_longitude` (Float) | Snapshot koordinat asal keberangkatan saat trip disusun. |
 | Delivery Trip | `custom_actual_departure`, Datetime | Waktu konfirmasi berangkat dari server. |
 | Delivery Trip | `custom_departed_by`, Link User | Petugas yang mengonfirmasi keberangkatan. |
 | Delivery Stop | `lat`, `lng` native | Snapshot koordinat Customer untuk tujuan tersebut. |

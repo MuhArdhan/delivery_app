@@ -217,9 +217,9 @@ Nama aplikasi tetap **Delivery App**. Pilihan Ekspedisi tetap mudah diakses dari
 
 ### Tahap 2 - Pemrosesan SO menjadi DN
 
-- [ ] Tambahkan daftar/ringkasan SO untuk proses pengiriman penuh.
-- [ ] Gunakan mapper native dan submit atomik dengan proteksi duplikasi/retry.
-- [ ] Tampilkan validasi ERPNext dan kebutuhan field wajib pada form yang ringkas.
+- [x] Tambahkan daftar/ringkasan SO untuk proses pengiriman penuh.
+- [x] Gunakan mapper native dan submit atomik dengan proteksi duplikasi/retry.
+- [x] Tampilkan validasi ERPNext dan kebutuhan field wajib pada form yang ringkas.
 
 ### Tahap 3 - Trip dan peta
 

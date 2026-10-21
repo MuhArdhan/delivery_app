@@ -89,4 +89,7 @@ export const DeliveryApi = {
   getCompanyDispatchLocation: (company) => callApi('delivery_app.api.get_company_dispatch_location', { company }, 'GET'),
   setCompanyDispatchLocation: (company, latitude, longitude) => callApi('delivery_app.api.set_company_dispatch_location', { company, latitude, longitude }, 'POST'),
   markTripDeparted: (tripName) => callApi('delivery_app.api.mark_trip_departed', { trip_name: tripName }, 'POST'),
+  getSalesOrders: (params) => callApi('delivery_app.api.get_sales_orders', params, 'GET'),
+  getSalesOrderDetail: (salesOrder) => callApi('delivery_app.api.get_sales_order_detail', { sales_order: salesOrder }, 'GET'),
+  createDeliveryNoteFromSo: (payload) => callApi('delivery_app.api.create_delivery_note_from_so', payload, 'POST'),
 };

@@ -1318,3 +1318,37 @@ def check_rates_estimate(courier_code: str = None, weight_grams: int = 1000):
 			})
 
 	return rates
+
+
+@frappe.whitelist()
+def get_sales_orders(company=None, date_from=None, date_to=None, search=None, status_filter="all", page=1, page_size=20):
+	"""List submitted Sales Orders eligible for Delivery Note intake."""
+	from delivery_app.services.so_intake import get_eligible_sales_orders
+	return get_eligible_sales_orders(
+		company=company,
+		date_from=date_from,
+		date_to=date_to,
+		search=search,
+		status_filter=status_filter,
+		page=page,
+		page_size=page_size,
+	)
+
+
+@frappe.whitelist()
+def get_sales_order_detail(sales_order: str):
+	"""Fetch details of a single Sales Order for intake verification and modal review."""
+	from delivery_app.services.so_intake import get_sales_order_intake_detail
+	return get_sales_order_intake_detail(sales_order)
+
+
+@frappe.whitelist()
+def create_delivery_note_from_so(sales_order: str, delivery_method: str = "Armada Sendiri", custom_warehouse: str = None):
+	"""Atomically create and submit a Delivery Note from a full Sales Order."""
+	from delivery_app.services.so_intake import create_delivery_note_from_so as _create_dn
+	return _create_dn(
+		sales_order=sales_order,
+		delivery_method=delivery_method,
+		custom_warehouse=custom_warehouse,
+	)
+

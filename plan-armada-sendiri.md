@@ -4,7 +4,7 @@ Status: rencana berdasarkan diskusi pengguna; implementasi dilakukan pada tahap 
 
 ## 1. Tujuan
 
-Delivery App menjadi tempat kerja sederhana untuk memproses pengiriman dari Sales Order dan memonitor armada sendiri. ERPNext menjadi sumber dokumen dan validasi transaksi.
+Delivery App menjadi tempat kerja sederhana untuk memproses pengiriman dari Sales Order dengan pilihan Armada Sendiri atau Ekspedisi. Prioritas pengembangan saat ini adalah monitoring armada sendiri; rincian alur ekspedisi masih belum final. ERPNext menjadi sumber dokumen dan validasi transaksi.
 
 Informasi utama yang harus cepat ditemukan: driver, nomor telepon, plat nomor, company, jadwal keberangkatan, keberangkatan aktual, SO/DN yang dibawa, progres kunjungan, dan checkpoint terakhir yang terkonfirmasi.
 
@@ -12,7 +12,8 @@ Informasi utama yang harus cepat ditemukan: driver, nomor telepon, plat nomor, c
 
 | Topik | Keputusan |
 | --- | --- |
-| Fokus | Pengiriman armada sendiri. Ekspedisi dan resi menjadi tahap lanjutan. |
+| Fokus | Prioritas monitoring armada sendiri. Rincian ekspedisi dan resi dibahas pada tahap lanjutan. |
+| Metode pengiriman | Pilihan Armada Sendiri dan Ekspedisi tetap tersedia di app. Alur ekspedisi belum final. |
 | Sumber pesanan | Sales Order yang sudah diterima/disubmit di ERPNext. |
 | Hubungan dokumen | Satu SO menjadi satu DN dengan seluruh barang yang harus dikirim. |
 | Pengiriman parsial | Alur app menggunakan pengiriman penuh. Jika barang belum siap, petugas menunggu. |
@@ -28,6 +29,8 @@ Informasi utama yang harus cepat ditemukan: driver, nomor telepon, plat nomor, c
 | Desain | Minimalis, user-friendly, bahasa Indonesia yang jelas, ikon Lucide, tanpa emoji/emoticon. |
 
 Company untuk satu trip harus sama dengan Company seluruh DN/SO di dalamnya. Pilihan DN pada layar penyusunan trip difilter per company, dengan validasi yang sama di backend.
+
+Delivery Trip armada sendiri hanya menerima DN bermetode Armada Sendiri. DN Ekspedisi tetap tercatat pada daftar pengiriman dengan metode yang jelas dan mengikuti alur ekspedisi yang sudah tersedia sampai rancangan lanjutannya ditetapkan.
 
 ## 3. Temuan dari kode existing
 
@@ -129,7 +132,7 @@ Periksa metadata situs terlebih dahulu dan gunakan field existing yang ekuivalen
 ### A. Menerima SO dan membuat DN
 
 1. Halaman **Pesanan** menampilkan SO submitted yang memenuhi syarat diproses, dengan pencarian serta filter company dan tanggal.
-2. Petugas memilih satu SO; ringkasan pelanggan, alamat, seluruh item, kuantitas, dan warehouse ditampilkan dari data ERPNext.
+2. Petugas memilih satu SO; ringkasan pelanggan, alamat, seluruh item, kuantitas, dan warehouse ditampilkan dari data ERPNext, beserta pilihan metode **Armada Sendiri / Ekspedisi**. Metode yang dipilih disimpan pada `Delivery Note.custom_delivery_method`.
 3. Aksi **Buat Delivery Note** menjalankan mapper native ERPNext, insert, dan submit dalam satu transaksi.
 4. Kuantitas mengikuti seluruh kebutuhan pengiriman SO. Backend memverifikasi hasil mapping; filter tanggal/item atau reservasi parsial tidak boleh menghasilkan DN parsial yang tampil sebagai pengiriman penuh.
 5. Field wajib yang belum lengkap, seperti warehouse atau serial/batch sesuai konfigurasi ERPNext, ditampilkan secara kontekstual untuk dilengkapi sebelum submit.
@@ -139,12 +142,12 @@ Periksa metadata situs terlebih dahulu dan gunakan field existing yang ekuivalen
 
 ### B. Menyusun perjalanan
 
-1. Pilih beberapa DN submitted dari satu company yang belum masuk trip aktif lainnya.
+1. Pilih beberapa DN submitted bermetode Armada Sendiri dari satu company yang belum masuk trip aktif lainnya.
 2. Isi driver, kendaraan, jadwal berangkat, serta urutan stop secara sederhana.
 3. Ambil titik keberangkatan dari company DN/SO. Lengkapi lokasi company/customer bila diperlukan.
 4. Tampilkan preview rute dan daftar tujuan bernomor, lalu simpan/submit Delivery Trip menggunakan lifecycle native ERPNext.
 5. Setiap DN memiliki stop tersendiri agar tetap cocok dengan pemindaian DN pada scanner. DN berbeda untuk customer yang sama tetap memiliki progres masing-masing walaupun pin lokasinya sama.
-6. Pemilihan company yang tidak cocok, DN ganda, DN draft/cancelled, dan DN yang ditugaskan ulang ke trip aktif lain divalidasi di backend.
+6. Pemilihan company yang tidak cocok, DN Ekspedisi, DN ganda, DN draft/cancelled, dan DN yang ditugaskan ulang ke trip aktif lain divalidasi di backend. Metode Ekspedisi pada DN existing harus dihormati ketika menyeleksi dokumen untuk trip.
 
 ### C. Monitoring
 
@@ -159,11 +162,11 @@ Periksa metadata situs terlebih dahulu dan gunakan field existing yang ekuivalen
 ### Navigasi
 
 - **Dashboard**: pusat monitoring.
-- **Pesanan**: tab Sales Order dan Delivery Note siap dijadwalkan.
+- **Pesanan**: tab Sales Order dan Delivery Note, dengan pilihan/filter metode Armada Sendiri atau Ekspedisi. DN armada sendiri yang memenuhi syarat dapat dilanjutkan ke penjadwalan trip.
 - **Perjalanan**: trip aktif, terjadwal, dan riwayat dengan satu pola tabel/filter.
 - **Pengaturan**: lokasi keberangkatan per company, pengaturan rute, serta akses data armada/driver.
 
-Nama aplikasi tetap **Delivery App**. Fitur ekspedisi ditempatkan di luar navigasi utama tahap armada sendiri. Detail dokumen existing tetap menjadi sumber riwayat yang sudah tercatat.
+Nama aplikasi tetap **Delivery App**. Pilihan Ekspedisi tetap mudah diakses dari Pesanan dan detail DN; informasi serta aksi ekspedisi ditampilkan secara kontekstual mengikuti fitur existing. Rincian layanan, resi, integrasi, dan monitoring ekspedisi belum ditetapkan sebagai rancangan final. Detail dokumen existing tetap menjadi sumber riwayat yang sudah tercatat.
 
 ### Dashboard
 
@@ -228,6 +231,7 @@ Nama aplikasi tetap **Delivery App**. Fitur ekspedisi ditempatkan di luar naviga
 ### Tahap 4 - Penyederhanaan UI
 
 - [ ] Susun navigasi Dashboard, Pesanan, Perjalanan, dan Pengaturan.
+- [ ] Pertahankan pilihan/filter Armada Sendiri dan Ekspedisi pada Pesanan serta metode yang tersimpan pada DN existing.
 - [ ] Jadikan tabel trip sebagai pusat monitoring dengan panel detail dan peta rute terpilih.
 - [ ] Tambahkan pembaruan berkala, filter company/status, dan state kosong/error.
 - [ ] Rapikan label, ukuran teks, dan layout responsif sesuai pedoman minimalis.
@@ -236,6 +240,7 @@ Nama aplikasi tetap **Delivery App**. Fitur ekspedisi ditempatkan di luar naviga
 
 - [ ] Uji SO penuh menjadi satu DN submitted; error stok/batch dari ERPNext membatalkan transaksi secara benar.
 - [ ] Uji request ganda/bersamaan, SO yang sudah diproses, dan DN yang sudah terikat trip.
+- [ ] Verifikasi kedua pilihan metode tetap tersedia, pilihan tersimpan pada DN, dan DN Ekspedisi ditolak dari trip armada sendiri tanpa mengubah metodenya.
 - [ ] Uji data company terpisah serta hak baca/tulis/submit sesuai ERPNext pada semua endpoint baru atau diubah.
 - [ ] Uji start sebelum checkpoint pertama, klik Berangkat ulang, serta trip cancelled/completed.
 - [ ] Uji scan berurutan, di luar urutan, scan ulang, visited tanpa riwayat, dan waktu konfirmasi yang tidak lengkap.
@@ -252,5 +257,6 @@ Pengujian otomatis diprioritaskan untuk transaksi DN, validasi company/penugasan
 2. Ketersediaan Scanner Scan History pada site dan kecukupan log untuk trip historis.
 3. Resource server, wilayah data OSM, dan endpoint OSRM untuk deployment.
 4. Usulan Berangkat oleh admin dan catatan kendala pada bagian 4 tetap merupakan default rancangan sampai ada informasi operasional tambahan.
+5. Finalisasi alur ekspedisi, termasuk layanan, input resi, integrasi, dan tampilan monitoringnya, dibahas terpisah setelah kebutuhan operasionalnya jelas.
 
 Plan ini menjadi arah pengembangan lanjutan dari `plan.md`, dengan prioritas monitoring armada sendiri sesuai diskusi terbaru.

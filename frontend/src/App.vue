@@ -10,12 +10,8 @@
           </div>
           <div>
             <div class="flex items-center space-x-2">
-              <span class="font-bold text-sm text-white tracking-tight">FleetOps</span>
-              <span class="text-[9px] font-semibold tracking-wider px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded border border-slate-700 uppercase">
-                Console
-              </span>
+              <span class="font-bold text-sm text-white tracking-tight">Delivery App</span>
             </div>
-            <p class="text-[10px] text-slate-400 tracking-wider uppercase font-medium">Logistics Manager</p>
           </div>
         </div>
       </div>
@@ -147,7 +143,7 @@ const userName = ref(window.workspace_user || 'Operator')
 const pendingCount = ref(0)
 
 const navItems = computed(() => [
-  { id: 'dashboard', label: 'Command Center', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'notes', label: 'Delivery Notes (Orders)', icon: Package, badge: pendingCount.value },
   { id: 'trips', label: 'Delivery Trips (Rute)', icon: Route },
   { id: 'pod', label: 'Proof of Delivery (POD)', icon: ShieldCheck },

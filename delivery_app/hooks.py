@@ -50,7 +50,7 @@ website_redirects = [
 add_to_apps_screen = [
 	{
 		"name": "delivery_app",
-		"title": "Delivery Console",
+		"title": "Delivery App",
 		"route": "/delivery",
 	}
 ]
@@ -247,4 +247,3 @@ add_to_apps_screen = [
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-

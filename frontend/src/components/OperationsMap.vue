@@ -5,6 +5,10 @@
     <!-- Map Overlay Stats / Filter -->
     <div class="absolute top-3 right-3 z-10 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-md border border-slate-700 text-xs text-slate-200 shadow-md flex items-center space-x-3">
       <span class="flex items-center space-x-1.5">
+        <span class="w-2.5 h-2.5 rounded bg-indigo-500"></span>
+        <span>Asal</span>
+      </span>
+      <span class="flex items-center space-x-1.5">
         <span class="w-2 h-2 rounded-full bg-amber-400"></span>
         <span>Siap Kirim</span>
       </span>
@@ -44,18 +48,37 @@ const mapContainer = ref(null)
 let map = null
 let markerLayer = null
 
-function getMarkerColor(status) {
-  if (status === 'Delivered') return '#10b981' // emerald-500
-  if (status === 'In Transit') return '#3b82f6' // blue-500
+function getMarkerColor(status, type) {
+  if (type === 'origin') return '#6366f1' // indigo-500
+  if (status === 'Delivered' || status === 'Terkirim') return '#10b981' // emerald-500
+  if (status === 'In Transit' || status === 'Dalam Pengiriman') return '#3b82f6' // blue-500
   return '#f59e0b' // amber-500
 }
 
 function createCustomIcon(marker) {
-  const color = getMarkerColor(marker.status)
+  if (marker.type === 'origin') {
+    const iconHtml = `
+      <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+        <div style="width: 20px; height: 20px; border-radius: 4px; background: #4f46e5; border: 2px solid #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center;">
+          <span style="width: 6px; height: 6px; border-radius: 1px; background: #ffffff;"></span>
+        </div>
+      </div>
+    `
+    return L.divIcon({
+      html: iconHtml,
+      className: 'custom-fleet-origin-pin',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -14]
+    })
+  }
+
+  const color = getMarkerColor(marker.status, marker.type)
+  const isVisited = marker.visited || marker.status === 'Delivered' || marker.status === 'Terkirim'
   
   const iconHtml = `
     <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-      <div style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: ${color}; opacity: 0.2; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+      ${!isVisited ? `<div style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: ${color}; opacity: 0.25; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>` : ''}
       <div style="width: 18px; height: 18px; border-radius: 50%; background: ${color}; border: 2px solid #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center;">
         <span style="width: 5px; height: 5px; border-radius: 50%; background: #ffffff;"></span>
       </div>
@@ -82,8 +105,13 @@ function renderMarkers() {
   const bounds = []
 
   props.markers.forEach((m) => {
-    if (!m.lat || !m.lng) return
-    const latLng = [Number(m.lat), Number(m.lng)]
+    if (m.lat === null || m.lat === undefined || m.lng === null || m.lng === undefined) return
+    const numLat = Number(m.lat)
+    const numLng = Number(m.lng)
+    if (isNaN(numLat) || isNaN(numLng)) return
+    if (numLat === 0 && numLng === 0) return
+
+    const latLng = [numLat, numLng]
     bounds.push(latLng)
 
     const icon = createCustomIcon(m)
@@ -93,14 +121,14 @@ function renderMarkers() {
       <div style="font-family: inherit; font-size: 12px; color: #1e293b; min-width: 190px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <strong style="color: #0f172a; font-size: 13px;">${m.id}</strong>
-          <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getMarkerColor(m.status)}20; color: ${getMarkerColor(m.status)};">
+          <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getMarkerColor(m.status, m.type)}20; color: ${getMarkerColor(m.status, m.type)};">
             ${m.status}
           </span>
         </div>
         <div style="font-weight: 600; color: #334155; margin-bottom: 3px;">${m.customer || 'Pelanggan'}</div>
         <div style="color: #64748b; font-size: 11px; line-height: 1.3; margin-bottom: 8px;">${m.address || '-'}</div>
         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 6px;">
-          <span style="font-size: 10px; color: #64748b;">${m.method}</span>
+          <span style="font-size: 10px; color: #64748b;">${m.method || 'Armada Sendiri'}</span>
           <button id="btn-popup-${m.id}" style="background: #0284c7; color: white; border: none; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;">
             Detail
           </button>
@@ -127,13 +155,14 @@ function renderMarkers() {
 function resetView() {
   if (!map) return
   if (props.markers && props.markers.length > 0) {
-    const bounds = props.markers.filter(m => m.lat && m.lng).map(m => [Number(m.lat), Number(m.lng)])
+    const valid = props.markers.filter(m => m.lat != null && m.lng != null && (Number(m.lat) !== 0 || Number(m.lng) !== 0))
+    const bounds = valid.map(m => [Number(m.lat), Number(m.lng)])
     if (bounds.length) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 })
       return
     }
   }
-  map.setView([-6.2000, 106.8166], 11)
+  map.setView([-7.6147, 110.6869], 10)
 }
 
 onMounted(() => {
@@ -142,7 +171,7 @@ onMounted(() => {
   map = L.map(mapContainer.value, {
     zoomControl: false,
     attributionControl: true
-  }).setView([-6.2000, 106.8166], 11)
+  }).setView([-7.6147, 110.6869], 10)
 
   L.control.zoom({ position: 'bottomright' }).addTo(map)
 

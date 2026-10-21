@@ -85,14 +85,19 @@
               <p class="text-xs text-slate-400">Monitoring titik antar dan status armada wilayah operasional</p>
             </div>
           </div>
-          <button
-            @click="refreshData"
-            :disabled="loading"
-            class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
-          >
-            <RefreshCw :size="13" :class="loading ? 'animate-spin' : ''" />
-            <span>{{ loading ? 'Memuat...' : 'Refresh' }}</span>
-          </button>
+          <div class="flex items-center space-x-2">
+            <span v-if="unlocatedCount > 0" class="text-[11px] text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+              {{ unlocatedCount }} titik belum diatur
+            </span>
+            <button
+              @click="refreshData"
+              :disabled="loading"
+              class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+            >
+              <RefreshCw :size="13" :class="loading ? 'animate-spin' : ''" />
+              <span>{{ loading ? 'Memuat...' : 'Refresh' }}</span>
+            </button>
+          </div>
         </div>
 
         <div class="flex-1 min-h-[420px] rounded-lg overflow-hidden border border-slate-100">
@@ -204,6 +209,7 @@ const emit = defineEmits(['nav', 'open-note'])
 const loading = ref(false)
 const kpi = ref({})
 const mapMarkers = ref([])
+const unlocatedCount = ref(0)
 const activityLog = ref([])
 
 async function refreshData() {
@@ -212,6 +218,7 @@ async function refreshData() {
     const res = await DeliveryApi.getSummary()
     kpi.value = res.kpi || {}
     mapMarkers.value = res.map_markers || []
+    unlocatedCount.value = res.unlocated_count || 0
     activityLog.value = res.activity_log || []
   } catch (err) {
     console.error('Failed to load dashboard summary:', err)

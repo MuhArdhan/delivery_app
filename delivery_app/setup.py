@@ -122,6 +122,51 @@ CUSTOM_FIELDS = {
 			"insert_after": "visited",
 		}
 	],
+	"Customer": [
+		{
+			"fieldname": "custom_delivery_location",
+			"label": "Lokasi Pengiriman",
+			"fieldtype": "Geolocation",
+			"insert_after": "customer_primary_address",
+			"description": "Titik lokasi pengiriman untuk monitoring armada sendiri",
+		}
+	],
+	"Company": [
+		{
+			"fieldname": "custom_dispatch_location",
+			"label": "Lokasi Keberangkatan",
+			"fieldtype": "Geolocation",
+			"insert_after": "company_name",
+			"description": "Titik lokasi asal keberangkatan armada untuk pengiriman company ini",
+		}
+	],
+	"Delivery Trip": [
+		{
+			"fieldname": "custom_origin_location",
+			"label": "Lokasi Asal",
+			"fieldtype": "Geolocation",
+			"insert_after": "departure_time",
+			"allow_on_submit": 1,
+			"description": "Snapshot lokasi asal saat trip dibuat",
+		},
+		{
+			"fieldname": "custom_actual_departure",
+			"label": "Waktu Berangkat Aktual",
+			"fieldtype": "Datetime",
+			"read_only": 1,
+			"allow_on_submit": 1,
+			"insert_after": "custom_origin_location",
+		},
+		{
+			"fieldname": "custom_departed_by",
+			"label": "Diberangkatkan Oleh",
+			"fieldtype": "Link",
+			"options": "User",
+			"read_only": 1,
+			"allow_on_submit": 1,
+			"insert_after": "custom_actual_departure",
+		},
+	],
 }
 
 

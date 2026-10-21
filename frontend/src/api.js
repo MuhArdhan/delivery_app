@@ -84,4 +84,9 @@ export const DeliveryApi = {
   trackWaybill: (dnName) => callApi('delivery_app.api.track_waybill_live', { delivery_note: dnName }, 'POST'),
   estimateRates: (payload) => callApi('delivery_app.api.check_rates_estimate', payload, 'GET'),
   submitPod: (payload) => callApi('delivery_app.api.submit_pod', payload, 'POST'),
+  getCustomerLocation: (customer) => callApi('delivery_app.api.get_customer_delivery_location', { customer }, 'GET'),
+  setCustomerLocation: (customer, latitude, longitude) => callApi('delivery_app.api.set_customer_delivery_location', { customer, latitude, longitude }, 'POST'),
+  getCompanyDispatchLocation: (company) => callApi('delivery_app.api.get_company_dispatch_location', { company }, 'GET'),
+  setCompanyDispatchLocation: (company, latitude, longitude) => callApi('delivery_app.api.set_company_dispatch_location', { company, latitude, longitude }, 'POST'),
+  markTripDeparted: (tripName) => callApi('delivery_app.api.mark_trip_departed', { trip_name: tripName }, 'POST'),
 };

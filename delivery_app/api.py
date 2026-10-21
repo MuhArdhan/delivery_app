@@ -8,6 +8,14 @@ from frappe import _
 from frappe.utils import now_datetime, getdate, format_datetime
 from frappe.utils.file_manager import save_file
 
+from delivery_app.services.fleet_monitoring import (
+	_clean_coord,
+	compute_trip_monitoring_status,
+	format_point_geojson,
+	get_trip_scan_history,
+	parse_geolocation,
+)
+
 
 COURIER_LIST = [
 	{"code": "jne", "name": "JNE Express", "services": ["REG", "YES", "JTR (Kargo)"], "badge": "jne"},
@@ -119,14 +127,40 @@ def get_active_trips():
 
 @frappe.whitelist()
 def start_trip(trip_name: str):
-	"""Change Delivery Trip status to In Transit."""
+	"""
+	Confirm and record actual departure for a Delivery Trip.
+	Idempotently sets custom_actual_departure and custom_departed_by.
+	Updates status to In Transit.
+	"""
 	trip = frappe.get_doc("Delivery Trip", trip_name)
+	if trip.docstatus == 2:
+		frappe.throw(_("Delivery Trip {0} sudah dibatalkan.").format(trip.name))
 	if trip.status == "Completed":
-		frappe.throw(_("Delivery Trip is already completed."))
+		frappe.throw(_("Delivery Trip {0} sudah selesai.").format(trip.name))
 
-	frappe.db.set_value("Delivery Trip", trip_name, "status", "In Transit", update_modified=True)
+	now = now_datetime()
+	actual_departure = trip.get("custom_actual_departure") or now
+	departed_by = trip.get("custom_departed_by") or frappe.session.user
+
+	update_dict = {
+		"status": "In Transit",
+		"custom_actual_departure": actual_departure,
+		"custom_departed_by": departed_by,
+	}
+	frappe.db.set_value("Delivery Trip", trip_name, update_dict, update_modified=True)
 	frappe.db.commit()
-	return {"status": "In Transit"}
+	return {
+		"success": True,
+		"status": "In Transit",
+		"actual_departure": actual_departure,
+		"departed_by": departed_by,
+	}
+
+
+@frappe.whitelist()
+def mark_trip_departed(trip_name: str):
+	"""Alias for start_trip to mark departure."""
+	return start_trip(trip_name)
 
 
 @frappe.whitelist()
@@ -212,20 +246,20 @@ def submit_pod(
 
 @frappe.whitelist()
 def get_operations_summary():
-	"""KPIs, Live Map Points, and Recent Activity for Command Center."""
+	"""KPIs, Real Map Points, and Recent Activity for Fleet Operations."""
 	today = getdate()
 
-	# 1. Total pending delivery notes
+	# 1. Total pending delivery notes needing scheduling (Armada Sendiri not on an active trip)
 	pending_notes = frappe.db.sql("""
 		SELECT count(name) FROM `tabDelivery Note`
 		WHERE docstatus = 1
 		AND status NOT IN ('Cancelled', 'Closed')
 		AND (
-			(custom_delivery_method = 'Armada Sendiri' AND (custom_pod_status IS NULL OR custom_pod_status = 'Pending'))
+			(custom_delivery_method = 'Armada Sendiri' AND (custom_pod_status IS NULL OR custom_pod_status = 'Pending') AND (delivery_trip IS NULL OR delivery_trip = ''))
 			OR
 			(custom_delivery_method = 'Ekspedisi' AND (custom_tracking_status IS NULL OR custom_tracking_status IN ('', 'Pending')))
 			OR
-			(custom_delivery_method IS NULL)
+			(custom_delivery_method IS NULL AND (delivery_trip IS NULL OR delivery_trip = ''))
 		)
 	""")[0][0] or 0
 
@@ -236,7 +270,21 @@ def get_operations_summary():
 		AND status IN ('Draft', 'Scheduled', 'In Transit')
 	""")[0][0] or 0
 
-	# 3. 3PL Couriers in transit
+	# 3. Scheduled Trips
+	scheduled_trips_count = frappe.db.sql("""
+		SELECT count(name) FROM `tabDelivery Trip`
+		WHERE docstatus = 1
+		AND status = 'Scheduled'
+	""")[0][0] or 0
+
+	# 4. In Transit Trips
+	in_transit_trips_count = frappe.db.sql("""
+		SELECT count(name) FROM `tabDelivery Trip`
+		WHERE docstatus = 1
+		AND status = 'In Transit'
+	""")[0][0] or 0
+
+	# 5. 3PL Couriers in transit
 	in_transit_couriers = frappe.db.sql("""
 		SELECT count(name) FROM `tabDelivery Note`
 		WHERE docstatus = 1
@@ -244,13 +292,12 @@ def get_operations_summary():
 		AND custom_tracking_status = 'In Transit'
 	""")[0][0] or 0
 
-	# 4. Delivered today
+	# 6. Delivered today
 	delivered_today = frappe.db.sql("""
 		SELECT count(name) FROM `tabProof of Delivery`
 		WHERE DATE(submitted_at) = %s
 	""", (today,))[0][0] or 0
 
-	# If no POD today, check Delivery Notes marked delivered today
 	if not delivered_today:
 		delivered_today = frappe.db.sql("""
 			SELECT count(name) FROM `tabDelivery Note`
@@ -263,58 +310,113 @@ def get_operations_summary():
 	total_vehicles = frappe.db.count("Vehicle")
 	total_drivers = frappe.db.count("Driver")
 
-	# Fetch Recent 25 Delivery Notes with location info for Live Operations Map
-	map_notes = frappe.db.sql("""
-		SELECT
-			dn.name, dn.customer, dn.customer_name, dn.posting_date, dn.grand_total,
-			dn.custom_delivery_method, dn.custom_courier_code, dn.custom_waybill_no,
-			dn.custom_tracking_status, dn.custom_pod_status, dn.shipping_address,
-			dn.shipping_address_name
-		FROM `tabDelivery Note` dn
-		WHERE dn.docstatus = 1
-		ORDER BY dn.creation DESC
-		LIMIT 40
+	# Fetch Real Map Points from active trips and recent notes (no synthetic demo coordinates)
+	map_markers = []
+	unlocated_count = 0
+	companies_seen = set()
+
+	# A. Active Trips & Stops
+	active_trips = frappe.db.sql("""
+		SELECT dt.name, dt.company, dt.driver_name, dt.vehicle, dt.status, dt.custom_origin_location
+		FROM `tabDelivery Trip` dt
+		WHERE dt.docstatus IN (0, 1)
+		AND dt.status IN ('Scheduled', 'In Transit')
+		ORDER BY dt.modified DESC
+		LIMIT 15
 	""", as_dict=True)
 
-	map_markers = []
-	# Coordinate cache to spread pins around Jabodetabek/Indonesia realistically if geocode is empty
-	base_lat, base_lng = -6.2000, 106.8166
-	idx_offset = 0
+	for trip in active_trips:
+		# Company dispatch origin
+		if trip.company and trip.company not in companies_seen:
+			companies_seen.add(trip.company)
+			orig_lat, orig_lng = parse_geolocation(trip.get("custom_origin_location"))
+			if orig_lat is None or orig_lng is None:
+				comp_loc = frappe.db.get_value("Company", trip.company, "custom_dispatch_location")
+				orig_lat, orig_lng = parse_geolocation(comp_loc)
 
-	for note in map_notes:
-		# Check Address
-		lat, lng = None, None
-		addr_name = note.get("shipping_address_name")
-		city_name = ""
-		if addr_name:
-			addr = frappe.db.get_value("Address", addr_name, ["address_line1", "city", "pincode"], as_dict=True)
-			if addr:
-				city_name = addr.city or ""
+			if orig_lat is not None and orig_lng is not None:
+				map_markers.append({
+					"id": f"ORIGIN-{trip.company}",
+					"type": "origin",
+					"trip_id": trip.name,
+					"customer": f"Gudang: {trip.company}",
+					"address": trip.company,
+					"method": "Armada Sendiri",
+					"status": "Asal Keberangkatan",
+					"lat": orig_lat,
+					"lng": orig_lng,
+					"has_coordinates": True,
+					"grand_total": 0,
+				})
 
-		# Fallback deterministic coordinates for visual demonstration on Leaflet
-		h = hash(note["name"]) % 1000
-		lat = base_lat + ((h % 50) - 25) * 0.008
-		lng = base_lng + (((h // 50) % 50) - 25) * 0.009
-		idx_offset += 1
+		# Trip stops
+		stops = frappe.db.sql("""
+			SELECT idx, customer, delivery_note, visited, customer_address, details, lat, lng
+			FROM `tabDelivery Stop`
+			WHERE parent = %s
+			ORDER BY idx ASC
+		""", (trip.name,), as_dict=True)
 
-		status = "Pending"
-		if note.get("custom_delivery_method") == "Ekspedisi":
-			status = note.get("custom_tracking_status") or "Pending"
+		for s in stops:
+			s_lat = _clean_coord(s.get("lat"))
+			s_lng = _clean_coord(s.get("lng"))
+			if s_lat is None or s_lng is None:
+				if s.get("customer"):
+					c_loc = frappe.db.get_value("Customer", s["customer"], "custom_delivery_location")
+					c_lat, c_lng = parse_geolocation(c_loc)
+					if c_lat is not None and c_lng is not None:
+						s_lat = c_lat
+						s_lng = c_lng
+
+			if s_lat is not None and s_lng is not None:
+				map_markers.append({
+					"id": s.get("delivery_note") or f"{trip.name}-stop-{s.get('idx')}",
+					"type": "stop",
+					"trip_id": trip.name,
+					"customer": s.get("customer") or "Pelanggan",
+					"address": (s.get("customer_address") or "").replace("<br>", ", ").strip(),
+					"method": "Armada Sendiri",
+					"status": "Terkirim" if s.get("visited") else "Dalam Pengiriman",
+					"visited": bool(s.get("visited")),
+					"lat": s_lat,
+					"lng": s_lng,
+					"has_coordinates": True,
+					"grand_total": 0,
+				})
+			else:
+				unlocated_count += 1
+
+	# B. Unassigned recent submitted notes
+	unassigned_notes = frappe.db.sql("""
+		SELECT dn.name, dn.customer, dn.customer_name, dn.shipping_address, dn.shipping_address_name,
+		       dn.custom_delivery_method, dn.grand_total
+		FROM `tabDelivery Note` dn
+		WHERE dn.docstatus = 1
+		AND (dn.delivery_trip IS NULL OR dn.delivery_trip = '')
+		AND (dn.custom_pod_status IS NULL OR dn.custom_pod_status = 'Pending')
+		ORDER BY dn.creation DESC
+		LIMIT 20
+	""", as_dict=True)
+
+	for note in unassigned_notes:
+		c_loc = frappe.db.get_value("Customer", note["customer"], "custom_delivery_location")
+		c_lat, c_lng = parse_geolocation(c_loc)
+		if c_lat is not None and c_lng is not None:
+			map_markers.append({
+				"id": note["name"],
+				"type": "note",
+				"customer": note.get("customer_name") or note["customer"],
+				"address": (note.get("shipping_address") or "").replace("<br>", ", ").strip(),
+				"method": note.get("custom_delivery_method") or "Armada Sendiri",
+				"status": "Siap Kirim",
+				"visited": False,
+				"lat": c_lat,
+				"lng": c_lng,
+				"has_coordinates": True,
+				"grand_total": note.get("grand_total") or 0,
+			})
 		else:
-			status = note.get("custom_pod_status") or "Pending"
-
-		map_markers.append({
-			"id": note["name"],
-			"customer": note.get("customer_name") or note.get("customer"),
-			"address": (note.get("shipping_address") or "").replace("<br>", ", ").strip(),
-			"method": note.get("custom_delivery_method") or "Armada Sendiri",
-			"courier": note.get("custom_courier_code") or "",
-			"waybill": note.get("custom_waybill_no") or "",
-			"status": status,
-			"lat": lat,
-			"lng": lng,
-			"grand_total": note.get("grand_total") or 0,
-		})
+			unlocated_count += 1
 
 	# Recent activity log
 	activity_log = []
@@ -354,12 +456,15 @@ def get_operations_summary():
 		"kpi": {
 			"pending_orders": pending_notes,
 			"active_trips": active_trips_count,
+			"scheduled_trips": scheduled_trips_count,
+			"in_transit_trips": in_transit_trips_count,
 			"in_transit_couriers": in_transit_couriers,
 			"delivered_today": delivered_today,
 			"total_vehicles": total_vehicles,
 			"total_drivers": total_drivers,
 		},
 		"map_markers": map_markers,
+		"unlocated_count": unlocated_count,
 		"activity_log": activity_log,
 	}
 
@@ -591,20 +696,29 @@ def create_delivery_trip(driver: str, vehicle: str, departure_time: str = None, 
 	if not stops:
 		frappe.throw(_("At least one Delivery Stop is required."))
 
-	# Validate no Ekspedisi notes are included
+	# Validate no Ekspedisi notes are included and check company consistency
+	dn_companies = set()
 	for stop_data in stops:
 		dn_name = stop_data.get("delivery_note")
 		if dn_name:
-			method = frappe.db.get_value("Delivery Note", dn_name, "custom_delivery_method")
-			if method == "Ekspedisi":
-				frappe.throw(_("Delivery Note {0} diatur untuk Ekspedisi (3PL). Tidak dapat dimasukkan ke Armada Sendiri.").format(dn_name))
+			dn_info = frappe.db.get_value("Delivery Note", dn_name, ["custom_delivery_method", "company"], as_dict=True)
+			if dn_info:
+				if dn_info.custom_delivery_method == "Ekspedisi":
+					frappe.throw(_("Delivery Note {0} diatur untuk Ekspedisi (3PL). Tidak dapat dimasukkan ke Armada Sendiri.").format(dn_name))
+				if dn_info.company:
+					dn_companies.add(dn_info.company)
 
-	if not company:
+	# Validate company consistency across all stops
+	if len(dn_companies) > 1:
+		frappe.throw(_("Semua Delivery Note dalam satu trip harus berasal dari Company yang sama: {0}").format(", ".join(sorted(dn_companies))))
+
+	if dn_companies:
+		target_company = next(iter(dn_companies))
+		if company and company != target_company:
+			frappe.throw(_("Company yang dipilih ({0}) berbeda dengan Company pada Delivery Note ({1}).").format(company, target_company))
+		company = target_company
+	elif not company:
 		company = frappe.db.get_single_value("Global Defaults", "default_company")
-		if not company:
-			first_dn = stops[0].get("delivery_note")
-			if first_dn:
-				company = frappe.db.get_value("Delivery Note", first_dn, "company")
 
 	trip = frappe.new_doc("Delivery Trip")
 	trip.company = company
@@ -613,20 +727,39 @@ def create_delivery_trip(driver: str, vehicle: str, departure_time: str = None, 
 	trip.departure_time = departure_time or now_datetime()
 	trip.status = "Draft"
 
+	# Snapshot Company dispatch location as trip origin
+	if company:
+		comp_loc = frappe.db.get_value("Company", company, "custom_dispatch_location")
+		if comp_loc:
+			trip.custom_origin_location = comp_loc
+
 	# Add stops
 	for idx, s in enumerate(stops, 1):
 		dn_name = s.get("delivery_note")
 		dn_doc = frappe.get_doc("Delivery Note", dn_name) if dn_name else None
 
+		customer_name = s.get("customer") or (dn_doc.customer if dn_doc else "")
+
+		# Resolve coordinates: priority is passed coordinates, fallback to Customer master
+		stop_lat = _clean_coord(s.get("lat"))
+		stop_lng = _clean_coord(s.get("lng"))
+		if stop_lat is None or stop_lng is None:
+			if customer_name:
+				cust_loc = frappe.db.get_value("Customer", customer_name, "custom_delivery_location")
+				c_lat, c_lng = parse_geolocation(cust_loc)
+				if c_lat is not None and c_lng is not None:
+					stop_lat = c_lat
+					stop_lng = c_lng
+
 		stop_row = trip.append("delivery_stops", {})
-		stop_row.customer = s.get("customer") or (dn_doc.customer if dn_doc else "")
+		stop_row.customer = customer_name
 		stop_row.delivery_note = dn_name
 		stop_row.address = s.get("address") or (dn_doc.shipping_address_name if dn_doc else "")
 		stop_row.customer_address = s.get("customer_address") or (dn_doc.shipping_address if dn_doc else "")
 		stop_row.grand_total = dn_doc.grand_total if dn_doc else 0
 		stop_row.contact = dn_doc.contact_person if dn_doc else None
-		stop_row.lat = float(s.get("lat")) if s.get("lat") else None
-		stop_row.lng = float(s.get("lng")) if s.get("lng") else None
+		stop_row.lat = stop_lat
+		stop_row.lng = stop_lng
 		stop_row.details = s.get("details") or ""
 		stop_row.visited = 0
 
@@ -648,6 +781,7 @@ def create_delivery_trip(driver: str, vehicle: str, departure_time: str = None, 
 		"trip_name": trip.name,
 		"driver": trip.driver,
 		"vehicle": trip.vehicle,
+		"company": trip.company,
 		"status": trip.status,
 		"total_stops": len(trip.delivery_stops)
 	}
@@ -674,14 +808,18 @@ def complete_trip(trip_name: str):
 
 
 @frappe.whitelist()
-def get_delivery_trips_list(status_filter=None, search=None, page=1, page_size=20):
-	"""List Delivery Trips with stops progress and vehicle info."""
+def get_delivery_trips_list(status_filter=None, company_filter=None, search=None, page=1, page_size=20):
+	"""List Delivery Trips with stops progress, monitoring status, and vehicle info."""
 	page = int(page)
 	page_size = int(page_size)
 	offset = (page - 1) * page_size
 
 	conditions = ["dt.docstatus IN (0, 1)"]
 	params = {}
+
+	if company_filter and company_filter != "All":
+		conditions.append("dt.company = %(company)s")
+		params["company"] = company_filter
 
 	if status_filter and status_filter != "All":
 		conditions.append("dt.status = %(status)s")
@@ -698,7 +836,8 @@ def get_delivery_trips_list(status_filter=None, search=None, page=1, page_size=2
 	trips = frappe.db.sql(f"""
 		SELECT
 			dt.name, dt.departure_time, dt.driver, dt.driver_name, dt.vehicle,
-			dt.status, dt.total_distance, dt.uom, dt.modified, dt.company, dt.docstatus
+			dt.status, dt.total_distance, dt.uom, dt.modified, dt.company, dt.docstatus,
+			dt.custom_actual_departure, dt.custom_departed_by
 		FROM `tabDelivery Trip` dt
 		WHERE {where_clause}
 		ORDER BY dt.creation DESC
@@ -707,14 +846,68 @@ def get_delivery_trips_list(status_filter=None, search=None, page=1, page_size=2
 
 	for t in trips:
 		stops = frappe.db.sql("""
-			SELECT idx, customer, delivery_note, visited, customer_address, details
+			SELECT idx, customer, delivery_note, visited, customer_address, details, lat, lng
 			FROM `tabDelivery Stop`
 			WHERE parent = %s
 			ORDER BY idx ASC
 		""", (t["name"],), as_dict=True)
+
+		total_stops = len(stops)
+		completed_stops = sum(1 for s in stops if s["visited"])
+
+		# Scan history for checkpoint
+		dn_names = [s["delivery_note"] for s in stops if s.get("delivery_note")]
+		scan_history = get_trip_scan_history(t["name"], dn_names)
+
+		last_checkpoint = None
+		unlocated_stops = 0
+		for s in stops:
+			s_lat = _clean_coord(s.get("lat"))
+			s_lng = _clean_coord(s.get("lng"))
+			if s_lat is None or s_lng is None:
+				unlocated_stops += 1
+
+			if s["visited"]:
+				dn = s.get("delivery_note")
+				scan = scan_history.get(dn) if dn else None
+				if scan and scan.get("confirmed_at"):
+					conf_at = scan["confirmed_at"]
+					if not last_checkpoint or (last_checkpoint.get("confirmed_at") and conf_at > last_checkpoint["confirmed_at"]):
+						last_checkpoint = {
+							"customer": s["customer"],
+							"delivery_note": dn,
+							"confirmed_at": conf_at,
+							"text": f"{s['customer']} ({format_datetime(conf_at, 'HH:mm')})"
+						}
+				elif not last_checkpoint:
+					last_checkpoint = {
+						"customer": s["customer"],
+						"delivery_note": dn,
+						"confirmed_at": None,
+						"text": f"{s['customer']} (waktu belum tersedia)"
+					}
+
+		monitoring_status = compute_trip_monitoring_status(
+			t["docstatus"],
+			total_stops,
+			completed_stops,
+			t.get("custom_actual_departure"),
+			t.get("status")
+		)
+
+		next_stop = next((s for s in stops if not s["visited"]), None)
+
 		t["stops"] = stops
-		t["total_stops"] = len(stops)
-		t["completed_stops"] = sum(1 for s in stops if s["visited"])
+		t["total_stops"] = total_stops
+		t["completed_stops"] = completed_stops
+		t["monitoring_status"] = monitoring_status
+		t["last_checkpoint"] = last_checkpoint
+		t["unlocated_stops"] = unlocated_stops
+		t["next_planned_stop"] = {
+			"idx": next_stop.get("idx"),
+			"customer": next_stop.get("customer"),
+			"delivery_note": next_stop.get("delivery_note"),
+		} if next_stop else None
 
 	return {
 		"items": trips,
@@ -726,13 +919,89 @@ def get_delivery_trips_list(status_filter=None, search=None, page=1, page_size=2
 
 @frappe.whitelist()
 def get_delivery_trip_detail(trip_name: str):
-	"""Detailed view of a Delivery Trip including full stop records and PODs."""
+	"""Detailed view of a Delivery Trip including full stop records, scan history, coordinates and PODs."""
 	trip = frappe.get_doc("Delivery Trip", trip_name)
 	trip_data = trip.as_dict()
 
+	# Origin location
+	orig_lat, orig_lng = parse_geolocation(trip.get("custom_origin_location"))
+	if orig_lat is None or orig_lng is None:
+		if trip.company:
+			comp_loc = frappe.db.get_value("Company", trip.company, "custom_dispatch_location")
+			orig_lat, orig_lng = parse_geolocation(comp_loc)
+
+	trip_data["origin_lat"] = orig_lat
+	trip_data["origin_lng"] = orig_lng
+	trip_data["has_origin_coordinates"] = bool(orig_lat is not None and orig_lng is not None)
+
+	# Scan history
+	dn_names = [stop.delivery_note for stop in trip.delivery_stops if stop.delivery_note]
+	scan_history = get_trip_scan_history(trip.name, dn_names)
+
 	stops_detailed = []
+	visited_count = 0
+	last_checkpoint = None
+
 	for stop in trip.delivery_stops:
 		stop_dict = stop.as_dict()
+
+		# Check coordinates
+		stop_lat = _clean_coord(stop.lat)
+		stop_lng = _clean_coord(stop.lng)
+		if stop_lat is None or stop_lng is None:
+			if stop.customer:
+				c_loc = frappe.db.get_value("Customer", stop.customer, "custom_delivery_location")
+				c_lat, c_lng = parse_geolocation(c_loc)
+				if c_lat is not None and c_lng is not None:
+					stop_lat = c_lat
+					stop_lng = c_lng
+
+		stop_dict["lat"] = stop_lat
+		stop_dict["lng"] = stop_lng
+		stop_dict["has_coordinates"] = bool(stop_lat is not None and stop_lng is not None)
+
+		# Visit & Confirmation status
+		is_visited = bool(stop.visited)
+		if is_visited:
+			visited_count += 1
+			dn = stop.delivery_note
+			scan = scan_history.get(dn) if dn else None
+			if scan and scan.get("confirmed_at"):
+				conf_at = scan["confirmed_at"]
+				stop_dict["confirmed_at"] = conf_at
+				stop_dict["scanned_by"] = scan.get("scanned_by")
+				stop_dict["scanned_by_name"] = scan.get("scanned_by_name")
+				stop_dict["confirmation_status"] = "confirmed"
+				stop_dict["confirmation_text"] = f"Terkonfirmasi: {format_datetime(conf_at, 'HH:mm')}"
+
+				if not last_checkpoint or (last_checkpoint.get("confirmed_at") and conf_at > last_checkpoint["confirmed_at"]):
+					last_checkpoint = {
+						"customer": stop.customer,
+						"delivery_note": dn,
+						"confirmed_at": conf_at,
+						"text": f"{stop.customer} ({format_datetime(conf_at, 'HH:mm')})"
+					}
+			else:
+				stop_dict["confirmed_at"] = None
+				stop_dict["scanned_by"] = None
+				stop_dict["scanned_by_name"] = None
+				stop_dict["confirmation_status"] = "visited_without_time"
+				stop_dict["confirmation_text"] = "Dikunjungi (waktu belum tersedia)"
+
+				if not last_checkpoint:
+					last_checkpoint = {
+						"customer": stop.customer,
+						"delivery_note": dn,
+						"confirmed_at": None,
+						"text": f"{stop.customer} (waktu belum tersedia)"
+					}
+		else:
+			stop_dict["confirmed_at"] = None
+			stop_dict["scanned_by"] = None
+			stop_dict["scanned_by_name"] = None
+			stop_dict["confirmation_status"] = "pending"
+			stop_dict["confirmation_text"] = "Belum dikunjungi"
+
 		# Check POD info
 		pod_info = None
 		if stop.custom_proof_of_delivery:
@@ -751,10 +1020,9 @@ def get_delivery_trip_detail(trip_name: str):
 					["name", "recipient_name", "recipient_relationship", "proof_photo", "signature", "latitude", "longitude", "submitted_at"],
 					as_dict=True
 				)
-
 		stop_dict["pod"] = pod_info
 
-		# Check items for stop delivery note
+		# Check items
 		if stop.delivery_note:
 			items = frappe.db.sql("""
 				SELECT item_code, item_name, qty, uom
@@ -765,7 +1033,29 @@ def get_delivery_trip_detail(trip_name: str):
 
 		stops_detailed.append(stop_dict)
 
+	total_stops = len(stops_detailed)
+	monitoring_status = compute_trip_monitoring_status(
+		trip.docstatus,
+		total_stops,
+		visited_count,
+		trip.get("custom_actual_departure"),
+		trip.get("status")
+	)
+
+	next_stop = next((s for s in stops_detailed if not s.get("visited")), None)
+
 	trip_data["delivery_stops"] = stops_detailed
+	trip_data["total_stops"] = total_stops
+	trip_data["completed_stops"] = visited_count
+	trip_data["monitoring_status"] = monitoring_status
+	trip_data["last_checkpoint"] = last_checkpoint
+	trip_data["next_planned_stop"] = {
+		"idx": next_stop.get("idx"),
+		"customer": next_stop.get("customer"),
+		"delivery_note": next_stop.get("delivery_note"),
+		"address": next_stop.get("customer_address"),
+	} if next_stop else None
+
 	return trip_data
 
 
@@ -784,7 +1074,19 @@ def get_fleet_resources():
 		order_by="license_plate asc"
 	)
 
-	companies = frappe.get_all("Company", fields=["name", "company_name", "abbr"])
+	companies_raw = frappe.get_all("Company", fields=["name", "company_name", "abbr", "custom_dispatch_location"])
+	companies = []
+	for c in companies_raw:
+		c_lat, c_lng = parse_geolocation(c.get("custom_dispatch_location"))
+		companies.append({
+			"name": c.name,
+			"company_name": c.company_name,
+			"abbr": c.abbr,
+			"has_dispatch_location": bool(c_lat is not None and c_lng is not None),
+			"dispatch_lat": c_lat,
+			"dispatch_lng": c_lng,
+		})
+
 	default_company = frappe.db.get_single_value("Global Defaults", "default_company")
 
 	return {
@@ -793,6 +1095,89 @@ def get_fleet_resources():
 		"companies": companies,
 		"default_company": default_company,
 		"couriers": COURIER_LIST
+	}
+
+
+@frappe.whitelist()
+def get_customer_delivery_location(customer: str):
+	"""Get customer coordinates from Customer master."""
+	if not customer:
+		frappe.throw(_("Customer is required."))
+	raw_geo = frappe.db.get_value("Customer", customer, "custom_delivery_location")
+	lat, lng = parse_geolocation(raw_geo)
+	primary_addr = frappe.db.get_value("Customer", customer, "customer_primary_address")
+	address_display = ""
+	if primary_addr:
+		addr_dict = frappe.db.get_value("Address", primary_addr, ["address_line1", "city", "pincode"], as_dict=True) or {}
+		address_display = ", ".join([v for v in addr_dict.values() if v])
+
+	return {
+		"customer": customer,
+		"latitude": lat,
+		"longitude": lng,
+		"has_location": bool(lat is not None and lng is not None),
+		"address_display": address_display
+	}
+
+
+@frappe.whitelist()
+def set_customer_delivery_location(customer: str, latitude: float, longitude: float):
+	"""Set customer coordinates in Customer master."""
+	if not customer:
+		frappe.throw(_("Customer is required."))
+	lat = _clean_coord(latitude)
+	lng = _clean_coord(longitude)
+	if lat is None or lng is None:
+		frappe.throw(_("Koordinat latitude dan longitude tidak valid."))
+
+	geo_str = format_point_geojson(lat, lng)
+	frappe.db.set_value("Customer", customer, "custom_delivery_location", geo_str, update_modified=True)
+	frappe.db.commit()
+
+	return {
+		"success": True,
+		"customer": customer,
+		"latitude": lat,
+		"longitude": lng,
+		"has_location": True
+	}
+
+
+@frappe.whitelist()
+def get_company_dispatch_location(company: str):
+	"""Get dispatch location coordinates from Company master."""
+	if not company:
+		frappe.throw(_("Company is required."))
+	raw_geo = frappe.db.get_value("Company", company, "custom_dispatch_location")
+	lat, lng = parse_geolocation(raw_geo)
+	return {
+		"company": company,
+		"latitude": lat,
+		"longitude": lng,
+		"has_location": bool(lat is not None and lng is not None)
+	}
+
+
+@frappe.whitelist()
+def set_company_dispatch_location(company: str, latitude: float, longitude: float):
+	"""Set dispatch location coordinates in Company master."""
+	if not company:
+		frappe.throw(_("Company is required."))
+	lat = _clean_coord(latitude)
+	lng = _clean_coord(longitude)
+	if lat is None or lng is None:
+		frappe.throw(_("Koordinat latitude dan longitude tidak valid."))
+
+	geo_str = format_point_geojson(lat, lng)
+	frappe.db.set_value("Company", company, "custom_dispatch_location", geo_str, update_modified=True)
+	frappe.db.commit()
+
+	return {
+		"success": True,
+		"company": company,
+		"latitude": lat,
+		"longitude": lng,
+		"has_location": True
 	}
 
 

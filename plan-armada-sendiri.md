@@ -209,11 +209,11 @@ Nama aplikasi tetap **Delivery App**. Pilihan Ekspedisi tetap mudah diakses dari
 
 ### Tahap 1 - Fondasi data monitoring
 
-- [ ] Verifikasi metadata situs untuk field lokasi dan keberangkatan yang ekuivalen.
-- [ ] Tambahkan field Customer, Company, dan snapshot/aktual trip melalui setup idempotent.
-- [ ] Bangun pembaca visited dan waktu konfirmasi dari Scanner Scan History.
-- [ ] Ganti koordinat demo pada API peta dengan sumber lokasi nyata dan state data belum lengkap.
-- [ ] Terapkan company berasal dari SO/DN serta validasi kesesuaian company pada trip.
+- [x] Verifikasi metadata situs untuk field lokasi dan keberangkatan yang ekuivalen.
+- [x] Tambahkan field Customer, Company, dan snapshot/aktual trip melalui setup idempotent.
+- [x] Bangun pembaca visited dan waktu konfirmasi dari Scanner Scan History.
+- [x] Ganti koordinat demo pada API peta dengan sumber lokasi nyata dan state data belum lengkap.
+- [x] Terapkan company berasal dari SO/DN serta validasi kesesuaian company pada trip.
 
 ### Tahap 2 - Pemrosesan SO menjadi DN
 

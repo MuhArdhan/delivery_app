@@ -1,0 +1,129 @@
+{
+ "actions": [],
+ "creation": "2026-10-21 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_biteship_api",
+  "enabled",
+  "environment",
+  "api_key",
+  "col_break_biteship",
+  "auto_tracking",
+  "sync_interval_hours",
+  "sec_supported_couriers",
+  "supported_couriers",
+  "sec_webhook",
+  "webhook_secret",
+  "webhook_endpoint"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_biteship_api",
+   "fieldtype": "Section Break",
+   "label": "Biteship API Credentials"
+  },
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable Biteship Integration"
+  },
+  {
+   "default": "Sandbox",
+   "fieldname": "environment",
+   "fieldtype": "Select",
+   "label": "Environment",
+   "options": "Sandbox\nLive"
+  },
+  {
+   "description": "Biteship secret API key (e.g. biteship_test.xxx or biteship_live.xxx)",
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "col_break_biteship",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Automatically check waybill status via background job",
+   "fieldname": "auto_tracking",
+   "fieldtype": "Check",
+   "label": "Auto-track In Transit Shipments"
+  },
+  {
+   "default": "3",
+   "description": "Frequency in hours between background tracking syncs",
+   "fieldname": "sync_interval_hours",
+   "fieldtype": "Int",
+   "label": "Tracking Sync Interval (Hours)"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_supported_couriers",
+   "fieldtype": "Section Break",
+   "label": "Supported Couriers (3PL)"
+  },
+  {
+   "default": "jne, jnt, sicepat, anteraja, ninja, pos, sentral, wahana, tiki, idexpress, lion, gosend, grab",
+   "description": "Courier identifiers used by Biteship public tracking",
+   "fieldname": "supported_couriers",
+   "fieldtype": "Small Text",
+   "label": "Supported Couriers",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_webhook",
+   "fieldtype": "Section Break",
+   "label": "Inbound Webhook Configuration"
+  },
+  {
+   "description": "Token to authenticate incoming status webhooks from Biteship",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret"
+  },
+  {
+   "default": "/api/method/delivery_app.services.biteship.handle_webhook",
+   "description": "Endpoint URL to configure in Biteship Dashboard -> Webhooks",
+   "fieldname": "webhook_endpoint",
+   "fieldtype": "Data",
+   "label": "Webhook Endpoint Path",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Delivery App",
+ "name": "Delivery Gateway Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Stock Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Delivery Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

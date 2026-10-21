@@ -1,0 +1,33 @@
+{% if guest_login_redirect %}<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fleet-Ops Delivery Console</title>
+  <noscript><meta http-equiv="refresh" content="0;url=/login?redirect-to=/delivery"></noscript>
+</head>
+<body>
+  <script>
+    location.replace('/login?redirect-to=' + encodeURIComponent(location.pathname + location.hash));
+  </script>
+</body>
+</html>
+{% else %}<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fleet-Ops Delivery Console</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="stylesheet" href="/assets/delivery_app/console/assets/index.css">
+  <script>
+    window.csrf_token = {{ csrf_token | tojson }};
+    window.workspace_user = {{ workspace_user | tojson }};
+  </script>
+</head>
+<body class="bg-slate-100 antialiased font-sans">
+  <div id="app"></div>
+  <script type="module" src="/assets/delivery_app/console/assets/index.js"></script>
+</body>
+</html>
+{% endif %}

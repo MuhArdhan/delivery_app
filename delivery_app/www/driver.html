@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>Driver Navigator - Delivery App</title>
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="theme-color" content="#2563eb">
+	<style>
+		:root {
+			--primary: #2563eb;
+			--primary-dark: #1d4ed8;
+			--success: #10b981;
+			--warning: #f59e0b;
+			--danger: #ef4444;
+			--gray-50: #f8fafc;
+			--gray-100: #f1f5f9;
+			--gray-200: #e2e8f0;
+			--gray-600: #475569;
+			--gray-800: #1e293b;
+			--gray-900: #0f172a;
+			--radius: 12px;
+		}
+		* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+		body { background: #f1f5f9; color: var(--gray-800); padding-bottom: 70px; }
+		header {
+			background: #0f172a;
+			color: #f8fafc;
+			padding: 14px 20px;
+			position: sticky;
+			top: 0;
+			z-index: 50;
+			border-bottom: 1px solid #1e293b;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		header h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+		header .driver-badge { font-size: 11px; color: #94a3b8; }
+		.btn-icon {
+			background: #1e293b;
+			border: 1px solid #334155;
+			color: #f1f5f9;
+			padding: 6px 12px;
+			border-radius: 6px;
+			cursor: pointer;
+			font-size: 12px;
+			font-weight: 500;
+		}
+		.container { max-width: 600px; margin: 0 auto; padding: 16px; }
+		.trip-card {
+			background: white;
+			border-radius: var(--radius);
+			padding: 18px;
+			margin-bottom: 16px;
+			box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+			border: 1px solid var(--gray-200);
+		}
+		.trip-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 12px;
+		}
+		.trip-id { font-weight: 700; font-size: 16px; color: var(--gray-900); }
+		.badge {
+			padding: 4px 10px;
+			border-radius: 9999px;
+			font-size: 11px;
+			font-weight: 700;
+			text-transform: uppercase;
+		}
+		.badge-scheduled { background: #fef3c7; color: #92400e; }
+		.badge-intransit { background: #dbeafe; color: #1e40af; }
+		.badge-completed { background: #d1fae5; color: #065f46; }
+		.trip-meta { font-size: 13px; color: var(--gray-600); line-height: 1.6; margin-bottom: 12px; }
+		.progress-bar-bg {
+			height: 8px;
+			background: var(--gray-200);
+			border-radius: 999px;
+			overflow: hidden;
+			margin-top: 8px;
+		}
+		.progress-bar-fill {
+			height: 100%;
+			background: var(--success);
+			width: 0%;
+			transition: width 0.3s ease;
+		}
+		.stop-card {
+			background: white;
+			border-radius: var(--radius);
+			padding: 16px;
+			margin-bottom: 12px;
+			box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+			border: 1px solid var(--gray-200);
+			position: relative;
+			overflow: hidden;
+		}
+		.stop-card.visited {
+			border-left: 5px solid var(--success);
+			opacity: 0.85;
+		}
+		.stop-card.pending {
+			border-left: 5px solid var(--primary);
+		}
+		.stop-num {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 24px;
+			height: 24px;
+			background: var(--gray-100);
+			border-radius: 50%;
+			font-weight: 700;
+			font-size: 12px;
+			color: var(--gray-800);
+			margin-right: 6px;
+		}
+		.stop-customer { font-weight: 700; font-size: 15px; color: var(--gray-900); margin-bottom: 4px; }
+		.stop-address { font-size: 13px; color: var(--gray-600); margin-bottom: 10px; line-height: 1.4; }
+		.stop-actions { display: flex; gap: 8px; margin-top: 12px; }
+		.btn {
+			padding: 10px 14px;
+			border-radius: 8px;
+			border: none;
+			font-size: 13px;
+			font-weight: 600;
+			cursor: pointer;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+			text-decoration: none;
+			flex: 1;
+		}
+		.btn-primary { background: var(--primary); color: white; }
+		.btn-primary:active { background: var(--primary-dark); }
+		.btn-outline { background: white; border: 1px solid var(--gray-200); color: var(--gray-800); }
+		.btn-success { background: var(--success); color: white; }
+		.empty-state { text-align: center; padding: 48px 16px; color: var(--gray-600); }
+		.empty-state svg { width: 56px; height: 56px; color: #94a3b8; margin-bottom: 12px; }
+
+		/* Modal styling */
+		.modal-overlay {
+			display: none;
+			position: fixed;
+			top: 0; left: 0; right: 0; bottom: 0;
+			background: rgba(15, 23, 42, 0.6);
+			backdrop-filter: blur(4px);
+			z-index: 100;
+			align-items: flex-end;
+		}
+		.modal-content {
+			background: white;
+			width: 100%;
+			max-width: 600px;
+			margin: 0 auto;
+			border-radius: 20px 20px 0 0;
+			padding: 20px;
+			max-height: 90vh;
+			overflow-y: auto;
+			animation: slideUp 0.25s ease-out;
+		}
+		@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+		.modal-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 16px;
+			padding-bottom: 10px;
+			border-bottom: 1px solid var(--gray-200);
+		}
+		.form-group { margin-bottom: 14px; }
+		.form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--gray-800); }
+		.form-control {
+			width: 100%;
+			padding: 10px 12px;
+			border: 1px solid var(--gray-200);
+			border-radius: 8px;
+			font-size: 14px;
+		}
+		.form-control:focus { outline: none; border-color: var(--primary); }
+		.sig-pad-container {
+			border: 2px dashed var(--gray-200);
+			border-radius: 8px;
+			background: #fafafa;
+			position: relative;
+		}
+		#sigCanvas { width: 100%; height: 160px; touch-action: none; border-radius: 8px; }
+		.photo-preview {
+			width: 100%;
+			max-height: 200px;
+			object-fit: cover;
+			border-radius: 8px;
+			display: none;
+			margin-top: 8px;
+		}
+		.gps-badge {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			font-size: 11px;
+			background: #e0f2fe;
+			color: #0369a1;
+			padding: 4px 8px;
+			border-radius: 6px;
+			margin-top: 6px;
+		}
+	</style>
+</head>
+<body>
+
+	<header>
+		<div>
+			<h1>Delivery Navigator</h1>
+			<div class="driver-badge">{{ driver_name }}</div>
+		</div>
+		<div style="display: flex; gap: 8px;">
+			<button class="btn-icon" onclick="fetchTrips()" title="Refresh" style="font-size: 11px; font-weight: 600; width: auto; padding: 0 10px;">Refresh</button>
+			<a href="/app" class="btn-icon" style="text-decoration: none; font-size: 11px; font-weight: 600; width: auto; padding: 0 10px;" title="Buka ERPNext Desk">Desk</a>
+		</div>
+	</header>
+
+	<div class="container">
+		<div id="loading" style="text-align: center; padding: 40px; color: var(--gray-600);">
+			Memuat trip pengiriman...
+		</div>
+		<div id="tripsContainer"></div>
+	</div>
+
+	<!-- Modal POD Submission -->
+	<div class="modal-overlay" id="podModal">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h3 style="font-size: 16px; font-weight: 700;">Bukti Serah Terima (POD)</h3>
+				<button class="btn-icon" style="background: var(--gray-100); color: var(--gray-800); font-weight: bold;" onclick="closePodModal()">X</button>
+			</div>
+			<form id="podForm" onsubmit="submitPodForm(event)">
+				<input type="hidden" id="dnId">
+				<input type="hidden" id="tripId">
+				<input type="hidden" id="stopId">
+
+				<div class="form-group">
+					<label class="form-label">Nama Penerima *</label>
+					<input type="text" class="form-control" id="recipientName" required placeholder="Contoh: Bpk. Ahmad">
+				</div>
+
+				<div class="form-group">
+					<label class="form-label">Hubungan dengan Pelanggan *</label>
+					<select class="form-control" id="recipientRelationship">
+						<option value="Yang Bersangkutan">Yang Bersangkutan</option>
+						<option value="Keluarga">Keluarga</option>
+						<option value="Satpam / Security">Satpam / Security</option>
+						<option value="Resepsionis / Front Office">Resepsionis / Front Office</option>
+						<option value="Rekan Kerja">Rekan Kerja</option>
+						<option value="Tetangga">Tetangga</option>
+						<option value="Lainnya">Lainnya</option>
+					</select>
+				</div>
+
+				<div class="form-group">
+					<label class="form-label">No. Telepon / WhatsApp Penerima</label>
+					<input type="tel" class="form-control" id="recipientPhone" placeholder="08xxxxxxxxxx">
+				</div>
+
+				<div class="form-group">
+					<label class="form-label">Foto Penyerahan Barang di Lokasi *</label>
+					<input type="file" id="cameraInput" accept="image/*" capture="environment" class="form-control" onchange="previewPhoto(event)" required>
+					<img id="photoPreview" class="photo-preview" alt="Preview Foto">
+				</div>
+
+				<div class="form-group">
+					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+						<label class="form-label" style="margin: 0;">Tanda Tangan Digital Penerima</label>
+						<button type="button" onclick="clearSignature()" style="background: none; border: none; font-size: 12px; color: var(--danger); cursor: pointer;">Hapus TTD</button>
+					</div>
+					<div class="sig-pad-container">
+						<canvas id="sigCanvas"></canvas>
+					</div>
+				</div>
+
+				<div class="form-group">
+					<div id="gpsStatus" class="gps-badge">Mendeteksi koordinat GPS perangkat...</div>
+				</div>
+
+				<div class="form-group">
+					<label class="form-label">Catatan Tambahan</label>
+					<textarea class="form-control" id="podNotes" rows="2" placeholder="Kondisi barang, titip pos satpam, dll..."></textarea>
+				</div>
+
+				<button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; margin-top: 8px;">
+					Simpan & Selesaikan Antar
+				</button>
+			</form>
+		</div>
+	</div>
+
+	<script>
+		let activeTrips = [];
+		let currentLat = null;
+		let currentLng = null;
+		let photoBase64 = null;
+
+		// Canvas Signature handling
+		const canvas = document.getElementById("sigCanvas");
+		const ctx = canvas.getContext("2d");
+		let isDrawing = false;
+		let hasSignature = false;
+
+		function resizeCanvas() {
+			const rect = canvas.getBoundingClientRect();
+			canvas.width = rect.width * (window.devicePixelRatio || 1);
+			canvas.height = 160 * (window.devicePixelRatio || 1);
+			ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+			ctx.lineWidth = 2.5;
+			ctx.lineCap = "round";
+			ctx.strokeStyle = "#0f172a";
+		}
+		window.addEventListener("resize", resizeCanvas);
+
+		function getCanvasPos(e) {
+			const rect = canvas.getBoundingClientRect();
+			const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+			const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+			return { x: clientX - rect.left, y: clientY - rect.top };
+		}
+
+		canvas.addEventListener("mousedown", (e) => { isDrawing = true; const p = getCanvasPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+		canvas.addEventListener("mousemove", (e) => { if (!isDrawing) return; const p = getCanvasPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasSignature = true; });
+		window.addEventListener("mouseup", () => { isDrawing = false; });
+
+		canvas.addEventListener("touchstart", (e) => { e.preventDefault(); isDrawing = true; const p = getCanvasPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }, { passive: false });
+		canvas.addEventListener("touchmove", (e) => { e.preventDefault(); if (!isDrawing) return; const p = getCanvasPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasSignature = true; }, { passive: false });
+		canvas.addEventListener("touchend", () => { isDrawing = false; });
+
+		function clearSignature() {
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			hasSignature = false;
+		}
+
+		function previewPhoto(event) {
+			const file = event.target.files[0];
+			if (!file) return;
+
+			// Downscale image to max 1280px to save mobile bandwidth
+			const reader = new FileReader();
+			reader.onload = function(e) {
+				const img = new Image();
+				img.onload = function() {
+					const maxDim = 1280;
+					let w = img.width;
+					let h = img.height;
+					if (w > maxDim || h > maxDim) {
+						if (w > h) { h = (h * maxDim) / w; w = maxDim; }
+						else { w = (w * maxDim) / h; h = maxDim; }
+					}
+					const oc = document.createElement("canvas");
+					oc.width = w; oc.height = h;
+					const oct = oc.getContext("2d");
+					oct.drawImage(img, 0, 0, w, h);
+					photoBase64 = oc.toDataURL("image/jpeg", 0.75);
+
+					const preview = document.getElementById("photoPreview");
+					preview.src = photoBase64;
+					preview.style.display = "block";
+				};
+				img.src = e.target.result;
+			};
+			reader.readAsDataURL(file);
+		}
+
+		function getDeviceLocation() {
+			if (navigator.geolocation) {
+				navigator.geolocation.getCurrentPosition(
+					(pos) => {
+						currentLat = pos.coords.latitude;
+						currentLng = pos.coords.longitude;
+						document.getElementById("gpsStatus").innerHTML = `GPS Terkunci: ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
+						document.getElementById("gpsStatus").style.background = "#f1f5f9";
+						document.getElementById("gpsStatus").style.color = "#0f172a";
+					},
+					(err) => {
+						document.getElementById("gpsStatus").innerHTML = `GPS tidak terdeteksi (${err.message})`;
+					},
+					{ enableHighAccuracy: true, timeout: 10000 }
+				);
+			}
+		}
+
+		async function fetchTrips() {
+			document.getElementById("loading").style.display = "block";
+			try {
+				const res = await fetch("/api/method/delivery_app.api.get_active_trips", {
+					headers: { "X-Frappe-CSRF-Token": "{{ csrf_token }}" }
+				});
+				const data = await res.json();
+				activeTrips = data.message || [];
+				renderTrips();
+			} catch (err) {
+				alert("Gagal mengambil daftar trip: " + err);
+			} finally {
+				document.getElementById("loading").style.display = "none";
+			}
+		}
+
+		function renderTrips() {
+			const container = document.getElementById("tripsContainer");
+			container.innerHTML = "";
+
+			if (activeTrips.length === 0) {
+				container.innerHTML = `
+					<div class="empty-state">
+						<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"></path></svg>
+						<h3>Tidak Ada Trip Aktif</h3>
+						<p style="font-size: 13px; margin-top: 6px;">Belum ada Delivery Trip yang ditugaskan kepada Anda saat ini.</p>
+					</div>
+				`;
+				return;
+			}
+
+			activeTrips.forEach(trip => {
+				const pct = trip.total_stops > 0 ? Math.round((trip.completed_stops / trip.total_stops) * 100) : 0;
+				let statusBadge = `<span class="badge badge-scheduled">${trip.status}</span>`;
+				if (trip.status === "In Transit") statusBadge = `<span class="badge badge-intransit">In Transit</span>`;
+				if (trip.status === "Completed") statusBadge = `<span class="badge badge-completed">Selesai</span>`;
+
+				let stopsHtml = "";
+				trip.stops.forEach((stop, i) => {
+					const isDone = stop.visited;
+					const mapsUrl = stop.lat && stop.lng 
+						? `https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}`
+						: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.customer_address || stop.customer)}`;
+
+					const waUrl = stop.phone ? `https://wa.me/${stop.phone.replace(/[^0-9]/g, '')}` : null;
+
+					stopsHtml += `
+						<div class="stop-card ${isDone ? 'visited' : 'pending'}">
+							<div style="display: flex; justify-content: space-between; align-items: flex-start;">
+								<div>
+									<div class="stop-customer"><span class="stop-num">${i + 1}</span>${stop.customer}</div>
+									<div class="stop-address">${stop.customer_address || 'Alamat belum diatur'}</div>
+									${stop.delivery_note ? `<div style="font-size: 11px; color: var(--gray-600); margin-bottom: 6px;">DN: <b>${stop.delivery_note}</b></div>` : ''}
+								</div>
+								<div>
+									${isDone 
+										? `<span class="badge badge-completed">Terkirim</span>` 
+										: `<span class="badge badge-scheduled">Pending</span>`}
+								</div>
+							</div>
+
+							<div class="stop-actions">
+								<a href="${mapsUrl}" target="_blank" class="btn btn-outline">Buka Maps</a>
+								${waUrl ? `<a href="${waUrl}" target="_blank" class="btn btn-outline">WhatsApp</a>` : ''}
+								${!isDone && stop.delivery_note 
+									? `<button class="btn btn-primary" onclick="openPodModal('${stop.delivery_note}', '${trip.name}', '${stop.name}', '${escape(stop.customer)}')">Input POD</button>` 
+									: ''}
+							</div>
+						</div>
+					`;
+				});
+
+				container.innerHTML += `
+					<div class="trip-card">
+						<div class="trip-header">
+							<div>
+								<div class="trip-id">${trip.name}</div>
+								<div class="trip-meta" style="margin: 0;">Kendaraan: <b>${trip.vehicle || '-'}</b></div>
+							</div>
+							${statusBadge}
+						</div>
+						<div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--gray-600); margin-top: 8px;">
+							<span>Progress Pengantaran:</span>
+							<span><b>${trip.completed_stops}</b> dari <b>${trip.total_stops}</b> Stop</span>
+						</div>
+						<div class="progress-bar-bg">
+							<div class="progress-bar-fill" style="width: ${pct}%;"></div>
+						</div>
+						${trip.status !== 'In Transit' && trip.status !== 'Completed' ? `
+							<button class="btn btn-primary" style="width: 100%; margin-top: 14px;" onclick="startTrip('${trip.name}')">
+								Mulai Perjalanan (In Transit)
+							</button>
+						` : ''}
+					</div>
+					<div style="font-size: 14px; font-weight: 700; color: var(--gray-800); margin: 16px 0 8px 4px;">Daftar Titik Pengantaran:</div>
+					${stopsHtml}
+				`;
+			});
+		}
+
+		async function startTrip(tripName) {
+			if (!confirm(`Mulai perjalanan untuk ${tripName}? Status akan diubah menjadi In Transit.`)) return;
+			try {
+				const res = await fetch("/api/method/delivery_app.api.start_trip", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"X-Frappe-CSRF-Token": "{{ csrf_token }}"
+					},
+					body: JSON.stringify({ trip_name: tripName })
+				});
+				const data = await res.json();
+				if (data.message && data.message.status) {
+					fetchTrips();
+				}
+			} catch (err) {
+				alert("Gagal memulai trip: " + err);
+			}
+		}
+
+		function openPodModal(dnId, tripId, stopId, customerName) {
+			document.getElementById("dnId").value = dnId;
+			document.getElementById("tripId").value = tripId;
+			document.getElementById("stopId").value = stopId;
+			document.getElementById("recipientName").value = unescape(customerName) || "";
+			document.getElementById("photoPreview").style.display = "none";
+			photoBase64 = null;
+			document.getElementById("cameraInput").value = "";
+			clearSignature();
+
+			document.getElementById("podModal").style.display = "flex";
+			setTimeout(() => {
+				resizeCanvas();
+				getDeviceLocation();
+			}, 100);
+		}
+
+		function closePodModal() {
+			document.getElementById("podModal").style.display = "none";
+		}
+
+		async function submitPodForm(event) {
+			event.preventDefault();
+			const submitBtn = document.getElementById("submitBtn");
+
+			if (!photoBase64) {
+				alert("Harap ambil foto penyerahan barang.");
+				return;
+			}
+
+			const sigData = hasSignature ? canvas.toDataURL("image/png") : null;
+			const payload = {
+				delivery_note: document.getElementById("dnId").value,
+				delivery_trip: document.getElementById("tripId").value,
+				delivery_stop: document.getElementById("stopId").value,
+				recipient_name: document.getElementById("recipientName").value,
+				recipient_relationship: document.getElementById("recipientRelationship").value,
+				recipient_phone: document.getElementById("recipientPhone").value,
+				proof_photo_data: photoBase64,
+				signature_data: sigData,
+				latitude: currentLat,
+				longitude: currentLng,
+				notes: document.getElementById("podNotes").value
+			};
+
+			submitBtn.disabled = true;
+			submitBtn.innerText = "Mengunggah bukti...";
+
+			try {
+				const res = await fetch("/api/method/delivery_app.api.submit_pod", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"X-Frappe-CSRF-Token": "{{ csrf_token }}"
+					},
+					body: JSON.stringify(payload)
+				});
+				const data = await res.json();
+				if (data.message && data.message.success) {
+					alert(`POD Berhasil disimpan (${data.message.pod_name})!`);
+					closePodModal();
+					fetchTrips();
+				} else {
+					alert("Gagal menyimpan POD: " + JSON.stringify(data));
+				}
+			} catch (err) {
+				alert("Terjadi kesalahan koneksi: " + err);
+			} finally {
+				submitBtn.disabled = false;
+				submitBtn.innerText = "Simpan & Selesaikan Antar";
+			}
+		}
+
+		// Initial load
+		fetchTrips();
+	</script>
+</body>
+</html>

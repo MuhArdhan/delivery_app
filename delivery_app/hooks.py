@@ -5,70 +5,56 @@ app_description = "Aplikasi Delivery"
 app_email = "ardhanaulia@gmail.com"
 app_license = "mit"
 
-# Apps
-# ------------------
-
-# required_apps = []
-
-# Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "delivery_app",
-# 		"logo": "/assets/delivery_app/logo.png",
-# 		"title": "Delivery App",
-# 		"route": "/delivery_app",
-# 		"has_permission": "delivery_app.api.permission.has_app_permission"
-# 	}
-# ]
+required_apps = ["erpnext"]
 
 # Includes in <head>
 # ------------------
 
-# include js, css files in header of desk.html
-# app_include_css = "/assets/delivery_app/css/delivery_app.css"
-# app_include_js = "/assets/delivery_app/js/delivery_app.js"
-
-# include js, css files in header of web template
-# web_include_css = "/assets/delivery_app/css/delivery_app.css"
-# web_include_js = "/assets/delivery_app/js/delivery_app.js"
-
-# include custom scss in every website theme (without file extension ".scss")
-# website_theme_scss = "delivery_app/public/scss/website"
-
-# include js, css files in header of web form
-# webform_include_js = {"doctype": "public/js/doctype.js"}
-# webform_include_css = {"doctype": "public/css/doctype.css"}
-
-# include js in page
-# page_js = {"page" : "public/js/file.js"}
-
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
-# doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
-# doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
+doctype_js = {
+	"Delivery Note": "public/js/delivery_note.js"
+}
 
-# Svg Icons
-# ------------------
-# include app icons in desk
-# app_include_icons = "delivery_app/public/icons.svg"
+# Installation & Migrations
+# -------------------------
+after_install = "delivery_app.setup.ensure_custom_fields"
+after_migrate = "delivery_app.setup.ensure_custom_fields"
 
-# Home Pages
-# ----------
+# Document Events
+# ---------------
+doc_events = {
+	"Delivery Trip": {
+		"validate": "delivery_app.overrides.delivery_trip.validate_delivery_trip"
+	}
+}
 
-# application home page (will override Website Settings)
-# home_page = "login"
+# Scheduled Tasks
+# ---------------
+scheduler_events = {
+	"hourly": [
+		"delivery_app.services.biteship.sync_active_shipments"
+	]
+}
 
-# website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
-
-# Generators
-# ----------
-
-# automatically create page for each record of this doctype
 # website_generators = ["Web Page"]
+
+# SPA Routing for Fleet-Ops Delivery Console
+website_route_rules = [
+	{"from_route": "/delivery/<path:app_path>", "to_route": "delivery"},
+]
+
+website_redirects = [
+	{"source": r"/app/delivery_app", "target": r"/delivery"},
+]
+
+add_to_apps_screen = [
+	{
+		"name": "delivery_app",
+		"title": "Delivery Console",
+		"route": "/delivery",
+	}
+]
+
 
 # automatically load and sync documents of this doctype from downstream apps
 # importable_doctypes = [doctype_1]

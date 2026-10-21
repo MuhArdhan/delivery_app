@@ -1,0 +1,257 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-21 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "delivery_note",
+  "customer",
+  "customer_name",
+  "col_break_meta",
+  "delivery_trip",
+  "delivery_stop",
+  "driver",
+  "driver_name",
+  "status",
+  "sec_recipient",
+  "recipient_name",
+  "recipient_relationship",
+  "recipient_phone",
+  "col_break_recipient",
+  "submitted_at",
+  "delivered_by",
+  "sec_evidence",
+  "proof_photo",
+  "signature",
+  "col_break_geo",
+  "latitude",
+  "longitude",
+  "location_address",
+  "sec_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "default": "POD-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "POD-.YYYY.-.#####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "delivery_note",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Delivery Note",
+   "options": "Delivery Note",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "delivery_note.customer",
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "delivery_note.customer_name",
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delivery_trip",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Delivery Trip",
+   "options": "Delivery Trip"
+  },
+  {
+   "fieldname": "delivery_stop",
+   "fieldtype": "Data",
+   "label": "Delivery Stop Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Driver",
+   "options": "Driver"
+  },
+  {
+   "fetch_from": "driver.full_name",
+   "fieldname": "driver_name",
+   "fieldtype": "Data",
+   "label": "Driver Name",
+   "read_only": 1
+  },
+  {
+   "default": "Submitted",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Submitted\nVerified\nRejected",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_recipient",
+   "fieldtype": "Section Break",
+   "label": "Recipient Details"
+  },
+  {
+   "fieldname": "recipient_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Recipient Name",
+   "reqd": 1
+  },
+  {
+   "default": "Yang Bersangkutan",
+   "fieldname": "recipient_relationship",
+   "fieldtype": "Select",
+   "label": "Recipient Relationship",
+   "options": "Yang Bersangkutan\nKeluarga\nSatpam / Security\nResepsionis / Front Office\nRekan Kerja\nTetangga\nLainnya",
+   "reqd": 1
+  },
+  {
+   "fieldname": "recipient_phone",
+   "fieldtype": "Data",
+   "label": "Recipient Phone"
+  },
+  {
+   "fieldname": "col_break_recipient",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Now",
+   "fieldname": "submitted_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Submitted At",
+   "reqd": 1
+  },
+  {
+   "default": "__user",
+   "fieldname": "delivered_by",
+   "fieldtype": "Link",
+   "label": "Delivered By User",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_evidence",
+   "fieldtype": "Section Break",
+   "label": "Evidence / Bukti Serah Terima"
+  },
+  {
+   "fieldname": "proof_photo",
+   "fieldtype": "Attach Image",
+   "label": "Proof Photo (Foto Serah Terima)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "signature",
+   "fieldtype": "Signature",
+   "label": "Recipient Signature (Tanda Tangan Digital)"
+  },
+  {
+   "fieldname": "col_break_geo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude (GPS)",
+   "precision": 7,
+   "read_only": 1
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude (GPS)",
+   "precision": 7,
+   "read_only": 1
+  },
+  {
+   "fieldname": "location_address",
+   "fieldtype": "Small Text",
+   "label": "Location Address",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_notes",
+   "fieldtype": "Section Break",
+   "label": "Additional Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Driver / Handover Notes"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Delivery App",
+ "name": "Proof of Delivery",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Stock Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Stock User",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "Delivery Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Delivery User",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

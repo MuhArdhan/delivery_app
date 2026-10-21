@@ -223,10 +223,10 @@ Nama aplikasi tetap **Delivery App**. Pilihan Ekspedisi tetap mudah diakses dari
 
 ### Tahap 3 - Trip dan peta
 
-- [ ] Lengkapi penyusunan trip, pin Customer/Company, serta snapshot koordinat.
-- [ ] Terapkan usulan Berangkat dengan waktu aktual dan status monitoring yang konsisten.
-- [ ] Tambahkan konfigurasi/deployment OSRM, cache rute, dan polyline jalan.
-- [ ] Tampilkan checkpoint, waktu konfirmasi, serta catatan existing per stop.
+- [x] Lengkapi penyusunan trip, pin Customer/Company, serta snapshot koordinat.
+- [x] Terapkan usulan Berangkat dengan waktu aktual dan status monitoring yang konsisten.
+- [x] Tambahkan konfigurasi/deployment OSRM, cache rute, dan polyline jalan.
+- [x] Tampilkan checkpoint, waktu konfirmasi, serta catatan existing per stop.
 
 ### Tahap 4 - Penyederhanaan UI
 

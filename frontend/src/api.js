@@ -74,7 +74,7 @@ export const DeliveryApi = {
   createTrip: (payload) => callApi('delivery_app.api.create_delivery_trip', payload, 'POST'),
   submitTrip: (tripName) => callApi('delivery_app.api.submit_delivery_trip', { trip_name: tripName }, 'POST'),
   startTrip: (tripName) => callApi('delivery_app.api.start_trip', { trip_name: tripName }, 'POST'),
-  completeTrip: (tripName) => callApi('delivery_app.api.complete_trip', { trip_name: tripName }, 'POST'),
+  completeTrip: (tripName, force = 0) => callApi('delivery_app.api.complete_trip', { trip_name: tripName, force }, 'POST'),
   getTrips: (filters) => callApi('delivery_app.api.get_delivery_trips_list', filters, 'GET'),
   getTripDetail: (tripName) => callApi('delivery_app.api.get_delivery_trip_detail', { trip_name: tripName }, 'GET'),
   getFleetResources: () => callApi('delivery_app.api.get_fleet_resources', {}, 'GET'),
@@ -92,4 +92,7 @@ export const DeliveryApi = {
   getSalesOrders: (params) => callApi('delivery_app.api.get_sales_orders', params, 'GET'),
   getSalesOrderDetail: (salesOrder) => callApi('delivery_app.api.get_sales_order_detail', { sales_order: salesOrder }, 'GET'),
   createDeliveryNoteFromSo: (payload) => callApi('delivery_app.api.create_delivery_note_from_so', payload, 'POST'),
+  getEligibleDeliveryNotes: (company) => callApi('delivery_app.api.get_eligible_delivery_notes_for_trip', { company }, 'GET'),
+  getTripRoute: (tripName) => callApi('delivery_app.api.get_trip_route', { trip_name: tripName }, 'GET'),
+  updateStopDetails: (tripName, stopIdx, details) => callApi('delivery_app.api.update_trip_stop_details', { trip_name: tripName, stop_idx: stopIdx, details }, 'POST'),
 };

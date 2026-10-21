@@ -685,6 +685,83 @@ def dispatch_ekspedisi(delivery_note: str, courier_code: str, waybill_no: str = 
 
 
 @frappe.whitelist()
+def get_eligible_delivery_notes_for_trip(company: str = None):
+	"""
+	Fetch submitted Delivery Notes eligible for assignment to an Armada Sendiri Delivery Trip.
+	Must not belong to another active (Draft, Scheduled, In Transit) Delivery Trip.
+	Excludes Ekspedisi notes.
+	Returns coordinate info from Customer master.
+	"""
+	conditions = [
+		"dn.docstatus = 1",
+		"dn.status NOT IN ('Cancelled', 'Closed')",
+		"(dn.custom_delivery_method IS NULL OR dn.custom_delivery_method != 'Ekspedisi')",
+		"(dn.custom_pod_status IS NULL OR dn.custom_pod_status != 'Delivered')",
+	]
+	params = {}
+
+	if company:
+		conditions.append("dn.company = %(company)s")
+		params["company"] = company
+
+	where_clause = " AND ".join(conditions)
+
+	notes = frappe.db.sql(f"""
+		SELECT
+			dn.name, dn.customer, dn.customer_name, dn.company, dn.posting_date,
+			dn.grand_total, dn.shipping_address_name, dn.shipping_address, dn.delivery_trip
+		FROM `tabDelivery Note` dn
+		WHERE {where_clause}
+		ORDER BY dn.creation DESC
+		LIMIT 50
+	""", params, as_dict=True)
+
+	# Active Delivery Trips
+	active_trips = set(
+		frappe.db.sql_list("""
+			SELECT dt.name FROM `tabDelivery Trip` dt
+			WHERE dt.docstatus IN (0, 1) AND dt.status IN ('Draft', 'Scheduled', 'In Transit')
+		""")
+	)
+
+	eligible = []
+	for n in notes:
+		if n.get("delivery_trip") and n["delivery_trip"] in active_trips:
+			continue
+
+		if active_trips:
+			in_active_stop = frappe.db.sql("""
+				SELECT 1 FROM `tabDelivery Stop` ds
+				WHERE ds.delivery_note = %s AND ds.parent IN %s
+			""", (n["name"], tuple(active_trips)))
+			if in_active_stop:
+				continue
+
+		# Customer coordinates
+		c_coords = frappe.db.get_value("Customer", n["customer"], ["custom_latitude", "custom_longitude"], as_dict=True) or {}
+		lat = _clean_coord(c_coords.get("custom_latitude"))
+		lng = _clean_coord(c_coords.get("custom_longitude"))
+
+		addr_text = (n.get("shipping_address") or "").replace("<br>", ", ").strip()
+
+		eligible.append({
+			"name": n["name"],
+			"customer": n["customer"],
+			"customer_name": n["customer_name"] or n["customer"],
+			"company": n["company"],
+			"posting_date": str(n["posting_date"]),
+			"grand_total": n["grand_total"],
+			"shipping_address_name": n.get("shipping_address_name") or "",
+			"customer_address": addr_text,
+			"lat": lat,
+			"lng": lng,
+			"has_coordinates": bool(lat is not None and lng is not None)
+		})
+
+	return eligible
+
+
+@frappe.whitelist()
 def create_delivery_trip(driver: str, vehicle: str, departure_time: str = None, stops: str = None, company: str = None):
 	"""Create native ERPNext Delivery Trip with sequenced stops from Delivery Notes."""
 	if not driver:
@@ -803,9 +880,24 @@ def submit_delivery_trip(trip_name: str):
 
 
 @frappe.whitelist()
-def complete_trip(trip_name: str):
-	"""Mark trip as completed."""
-	frappe.db.set_value("Delivery Trip", trip_name, "status", "Completed", update_modified=True)
+def complete_trip(trip_name: str, force: bool = False):
+	"""Mark trip as completed consistent with stops visited status."""
+	trip = frappe.get_doc("Delivery Trip", trip_name)
+	if trip.docstatus != 1:
+		frappe.throw(_("Hanya Delivery Trip yang berstatus submitted yang dapat diselesaikan."))
+
+	unvisited = [s for s in trip.delivery_stops if not s.visited]
+	force = frappe.utils.cint(force)
+	if unvisited and not force:
+		frappe.throw(_("Tidak dapat menyelesaikan trip. Masih terdapat {0} dari {1} titik antar yang belum dikunjungi.").format(len(unvisited), len(trip.delivery_stops)))
+
+	if unvisited and force:
+		for s in unvisited:
+			s.visited = 1
+		trip.flags.ignore_validate_update_after_submit = True
+		trip.save(ignore_permissions=True)
+
+	trip.db_set("status", "Completed")
 	frappe.db.commit()
 	return {"success": True, "status": "Completed"}
 
@@ -1059,7 +1151,48 @@ def get_delivery_trip_detail(trip_name: str):
 		"address": next_stop.get("customer_address"),
 	} if next_stop else None
 
+	# Attach OSRM Road Route
+	from delivery_app.services.osrm_routing import get_trip_osrm_route
+	trip_data["route"] = get_trip_osrm_route(trip.name)
+
 	return trip_data
+
+
+@frappe.whitelist()
+def get_trip_route(trip_name: str):
+	"""Get OSRM road route geometry and distance for a Delivery Trip."""
+	from delivery_app.services.osrm_routing import get_trip_osrm_route
+	return get_trip_osrm_route(trip_name)
+
+
+@frappe.whitelist()
+def update_trip_stop_details(trip_name: str, stop_idx: int, details: str = None):
+	"""Update Delivery Stop details (kendala pengantaran / catatan operasional)."""
+	if not trip_name:
+		frappe.throw(_("Delivery Trip harus ditentukan."))
+
+	trip = frappe.get_doc("Delivery Trip", trip_name)
+	found = False
+	for stop in trip.delivery_stops:
+		if stop.idx == int(stop_idx):
+			stop.details = details or ""
+			found = True
+			break
+
+	if not found:
+		frappe.throw(_("Stop urutan {0} tidak ditemukan pada trip {1}.").format(stop_idx, trip_name))
+
+	trip.flags.ignore_validate_update_after_submit = True
+	trip.save(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {
+		"success": True,
+		"trip_name": trip_name,
+		"stop_idx": stop_idx,
+		"details": details or ""
+	}
+
 
 
 @frappe.whitelist()
@@ -1242,11 +1375,23 @@ def get_gateway_settings_api():
 		"supported_couriers": settings.supported_couriers or "",
 		"webhook_endpoint": settings.webhook_endpoint or "/api/method/delivery_app.services.biteship.handle_webhook",
 		"has_webhook_secret": bool(settings.get_password("webhook_secret", raise_exception=False)),
+		"osrm_enabled": bool(getattr(settings, "osrm_enabled", 1)),
+		"osrm_base_url": getattr(settings, "osrm_base_url", "https://router.project-osrm.org") or "https://router.project-osrm.org",
 	}
 
 
 @frappe.whitelist()
-def save_gateway_settings_api(enabled, environment, api_key=None, auto_tracking=1, sync_interval_hours=3, supported_couriers=None, webhook_secret=None):
+def save_gateway_settings_api(
+	enabled,
+	environment,
+	api_key=None,
+	auto_tracking=1,
+	sync_interval_hours=3,
+	supported_couriers=None,
+	webhook_secret=None,
+	osrm_enabled=1,
+	osrm_base_url=None
+):
 	"""Update settings from SPA."""
 	roles = frappe.get_roles(frappe.session.user)
 	if not ("System Manager" in roles or "Stock Manager" in roles or "Delivery Manager" in roles):
@@ -1263,6 +1408,12 @@ def save_gateway_settings_api(enabled, environment, api_key=None, auto_tracking=
 	settings.sync_interval_hours = int(sync_interval_hours)
 	if supported_couriers:
 		settings.supported_couriers = supported_couriers
+
+	if hasattr(settings, "osrm_enabled"):
+		settings.osrm_enabled = int(osrm_enabled)
+	if hasattr(settings, "osrm_base_url") and osrm_base_url is not None:
+		settings.osrm_base_url = osrm_base_url.strip()
+
 	settings.save()
 	frappe.db.commit()
 

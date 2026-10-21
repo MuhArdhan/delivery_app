@@ -28,6 +28,31 @@
         Reset
       </button>
     </div>
+
+    <!-- Route Polyline Status Banner -->
+    <div
+      v-if="routeInfo && routeInfo.route_points && routeInfo.route_points.length > 0"
+      class="absolute bottom-3 left-3 z-10 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-md border border-slate-700 text-xs text-slate-200 shadow-md flex items-center space-x-2"
+    >
+      <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+      <span class="font-medium">Rute Rencana:</span>
+      <span class="text-slate-300">{{ routeInfo.distance_km || 0 }} km (Est. {{ routeInfo.duration_min || 0 }} mnt)</span>
+    </div>
+
+    <!-- Routing Unavailable Warning & Retry -->
+    <div
+      v-else-if="routeInfo && routeInfo.success === false"
+      class="absolute bottom-3 left-3 z-10 bg-amber-950/90 backdrop-blur-md px-3 py-1.5 rounded-md border border-amber-800 text-xs text-amber-200 shadow-md flex items-center space-x-2"
+    >
+      <span>{{ routeInfo.message || 'Rute jalan belum tersedia' }}</span>
+      <button
+        type="button"
+        @click="$emit('retry-route')"
+        class="px-2 py-0.5 bg-amber-800 hover:bg-amber-700 rounded text-[11px] text-white font-medium transition"
+      >
+        Coba Lagi
+      </button>
+    </div>
   </div>
 </template>
 
@@ -39,14 +64,23 @@ const props = defineProps({
   markers: {
     type: Array,
     default: () => []
+  },
+  routePolyline: {
+    type: Array,
+    default: () => []
+  },
+  routeInfo: {
+    type: Object,
+    default: null
   }
 })
 
-const emit = defineEmits(['select-marker'])
+const emit = defineEmits(['select-marker', 'retry-route'])
 
 const mapContainer = ref(null)
 let map = null
 let markerLayer = null
+let polylineLayer = null
 
 function getMarkerColor(status, type) {
   if (type === 'origin') return '#6366f1' // indigo-500
@@ -58,29 +92,30 @@ function getMarkerColor(status, type) {
 function createCustomIcon(marker) {
   if (marker.type === 'origin') {
     const iconHtml = `
-      <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-        <div style="width: 20px; height: 20px; border-radius: 4px; background: #4f46e5; border: 2px solid #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center;">
-          <span style="width: 6px; height: 6px; border-radius: 1px; background: #ffffff;"></span>
+      <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+        <div style="width: 22px; height: 22px; border-radius: 6px; background: #4f46e5; border: 2px solid #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: 700;">
+          A
         </div>
       </div>
     `
     return L.divIcon({
       html: iconHtml,
       className: 'custom-fleet-origin-pin',
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
-      popupAnchor: [0, -14]
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -15]
     })
   }
 
   const color = getMarkerColor(marker.status, marker.type)
   const isVisited = marker.visited || marker.status === 'Delivered' || marker.status === 'Terkirim'
-  
+  const stopNumber = marker.stop_number || marker.idx || ''
+
   const iconHtml = `
-    <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+    <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
       ${!isVisited ? `<div style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: ${color}; opacity: 0.25; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>` : ''}
-      <div style="width: 18px; height: 18px; border-radius: 50%; background: ${color}; border: 2px solid #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center;">
-        <span style="width: 5px; height: 5px; border-radius: 50%; background: #ffffff;"></span>
+      <div style="width: 20px; height: 20px; border-radius: 50%; background: ${color}; border: 2px solid #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: 700;">
+        ${stopNumber ? `<span>${stopNumber}</span>` : `<span style="width: 5px; height: 5px; border-radius: 50%; background: #ffffff;"></span>`}
       </div>
     </div>
   `
@@ -88,14 +123,16 @@ function createCustomIcon(marker) {
   return L.divIcon({
     html: iconHtml,
     className: 'custom-fleet-pin',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -14]
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15]
   })
 }
 
-function renderMarkers() {
+function renderMarkersAndRoute() {
   if (!map) return
+
+  // 1. Render Markers
   if (markerLayer) {
     markerLayer.clearLayers()
   } else {
@@ -117,6 +154,8 @@ function renderMarkers() {
     const icon = createCustomIcon(m)
     const marker = L.marker(latLng, { icon })
 
+    const confirmationInfo = m.confirmed_at_text ? `<div style="color: #059669; font-size: 10px; font-weight: 600; margin-bottom: 4px;">${m.confirmed_at_text}</div>` : ''
+
     const popupHtml = `
       <div style="font-family: inherit; font-size: 12px; color: #1e293b; min-width: 190px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -125,6 +164,7 @@ function renderMarkers() {
             ${m.status}
           </span>
         </div>
+        ${confirmationInfo}
         <div style="font-weight: 600; color: #334155; margin-bottom: 3px;">${m.customer || 'Pelanggan'}</div>
         <div style="color: #64748b; font-size: 11px; line-height: 1.3; margin-bottom: 8px;">${m.address || '-'}</div>
         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 6px;">
@@ -147,6 +187,31 @@ function renderMarkers() {
     markerLayer.addLayer(marker)
   })
 
+  // 2. Render Polyline (Road Route)
+  if (polylineLayer) {
+    polylineLayer.clearLayers()
+  } else {
+    polylineLayer = L.layerGroup().addTo(map)
+  }
+
+  const polyCoords = props.routePolyline || []
+  if (polyCoords.length > 1) {
+    const polyline = L.polyline(polyCoords, {
+      color: '#0284c7',
+      weight: 4,
+      opacity: 0.85,
+      lineJoin: 'round'
+    })
+
+    const routeDistance = props.routeInfo?.distance_km ? `${props.routeInfo.distance_km} km` : ''
+    polyline.bindTooltip(`Rute Rencana ${routeDistance}`, { sticky: true })
+    polylineLayer.addLayer(polyline)
+
+    // Add polyline points to bounds
+    polyCoords.forEach(p => bounds.push(p))
+  }
+
+  // 3. Fit Bounds
   if (bounds.length > 0) {
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 })
   }
@@ -154,14 +219,18 @@ function renderMarkers() {
 
 function resetView() {
   if (!map) return
-  if (props.markers && props.markers.length > 0) {
-    const valid = props.markers.filter(m => m.lat != null && m.lng != null && (Number(m.lat) !== 0 || Number(m.lng) !== 0))
-    const bounds = valid.map(m => [Number(m.lat), Number(m.lng)])
-    if (bounds.length) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 })
-      return
-    }
+  const valid = (props.markers || []).filter(m => m.lat != null && m.lng != null && (Number(m.lat) !== 0 || Number(m.lng) !== 0))
+  const bounds = valid.map(m => [Number(m.lat), Number(m.lng)])
+
+  if (props.routePolyline && props.routePolyline.length > 0) {
+    props.routePolyline.forEach(p => bounds.push(p))
   }
+
+  if (bounds.length > 0) {
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 })
+    return
+  }
+
   map.setView([-7.6147, 110.6869], 10)
 }
 
@@ -175,18 +244,16 @@ onMounted(() => {
 
   L.control.zoom({ position: 'bottomright' }).addTo(map)
 
-  // Public OSM tiles: no bulk downloads or offline prefetching.
-  // Usage policy: https://operations.osmfoundation.org/policies/tiles/
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map)
 
-  renderMarkers()
+  renderMarkersAndRoute()
 })
 
-watch(() => props.markers, () => {
-  renderMarkers()
+watch(() => [props.markers, props.routePolyline], () => {
+  renderMarkersAndRoute()
 }, { deep: true })
 
 onBeforeUnmount(() => {
@@ -200,12 +267,13 @@ onBeforeUnmount(() => {
 <style>
 @keyframes ping {
   75%, 100% {
-    transform: scale(2);
+    transform: scale(2.2);
     opacity: 0;
   }
 }
-.custom-fleet-pin {
-  background: transparent !important;
-  border: none !important;
+
+.custom-fleet-pin, .custom-fleet-origin-pin {
+  background: transparent;
+  border: none;
 }
 </style>

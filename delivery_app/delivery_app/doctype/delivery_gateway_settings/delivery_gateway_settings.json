@@ -93,6 +93,26 @@
    "fieldtype": "Data",
    "label": "Webhook Endpoint Path",
    "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_osrm_routing",
+   "fieldtype": "Section Break",
+   "label": "Open Source Routing Machine (OSRM)"
+  },
+  {
+   "default": "1",
+   "description": "Aktifkan rute jalan raya OSRM untuk visualisasi Delivery Trip",
+   "fieldname": "osrm_enabled",
+   "fieldtype": "Check",
+   "label": "Aktifkan OSRM Routing"
+  },
+  {
+   "default": "https://router.project-osrm.org",
+   "description": "Base URL layanan OSRM Route API atau server lokal self-hosted (contoh: http://osrm:5000)",
+   "fieldname": "osrm_base_url",
+   "fieldtype": "Data",
+   "label": "OSRM Base URL"
   }
  ],
  "index_web_pages_for_search": 0,

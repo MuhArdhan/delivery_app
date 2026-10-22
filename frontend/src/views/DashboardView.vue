@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="flex flex-col gap-6">
     <!-- Top KPI Grid: Menunggu Penjadwalan, Terjadwal, Dalam Perjalanan, Selesai Kunjungan Hari Ini -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- 1. Menunggu Penjadwalan -->
@@ -74,7 +74,7 @@
     <!-- Main Map & Activity Split -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Operations Map (2 Cols) -->
-      <div class="lg:col-span-2 bg-white rounded-xl p-5 border border-slate-200 flex flex-col space-y-3 shadow-xs">
+      <div class="order-2 lg:order-1 min-w-0 lg:col-span-2 bg-white rounded-xl p-5 border border-slate-200 flex flex-col space-y-3 shadow-xs">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2.5">
             <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
@@ -128,59 +128,31 @@
         </div>
       </div>
 
-      <!-- Recent Live Activity (1 Col) -->
-      <div class="bg-white rounded-xl p-5 border border-slate-200 flex flex-col shadow-xs">
-        <div class="flex items-center space-x-2.5 mb-4">
-          <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
-            <Activity :size="16" />
-          </div>
-          <div>
-            <h3 class="font-semibold text-sm text-slate-900">Aktivitas Terkini</h3>
-            <p class="text-xs text-slate-400">Pergerakan trip dan submit bukti POD terbaru</p>
-          </div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-[380px]">
-          <div
-            v-for="(act, idx) in activityLog"
-            :key="idx"
-            class="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition flex items-start space-x-3 text-xs"
+      <!-- Trip selection next to the map; before it on mobile. -->
+      <div class="order-1 lg:order-2 min-w-0 bg-white rounded-xl p-5 border border-slate-200 flex flex-col shadow-xs">
+        <h3 class="font-semibold text-sm text-slate-900">Pilih Trip</h3>
+        <p class="text-xs text-slate-500 mt-1 mb-4">Pilih perjalanan untuk menampilkan rute pada peta.</p>
+        <div class="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-64 lg:max-h-[420px]">
+          <button
+            v-for="trip in tripsList"
+            :key="trip.name"
+            @click="handleSelectTripRow(trip)"
+            :aria-pressed="selectedTripDetail?.name === trip.name"
+            :class="['w-full text-left rounded-lg border p-3 transition', selectedTripDetail?.name === trip.name ? 'bg-sky-50 border-sky-500' : 'border-slate-200 hover:bg-slate-50']"
           >
-            <div class="w-7 h-7 rounded-md bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 text-slate-600">
-              <component :is="act.type === 'trip' ? RouteIcon : ShieldCheck" :size="14" />
+            <div class="flex flex-wrap justify-between gap-2 text-sm font-semibold text-slate-900">
+              <span>{{ trip.driver_name || trip.driver || trip.name }}</span>
+              <span>{{ trip.vehicle }}</span>
             </div>
-            <div class="min-w-0 flex-1">
-              <div class="flex justify-between items-center">
-                <span class="font-semibold text-slate-800 truncate">{{ act.title }}</span>
-                <span class="text-[10px] text-slate-400">{{ act.time }}</span>
-              </div>
-              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{{ act.description }}</p>
-              <div class="mt-1.5 flex items-center space-x-2">
-                <span
-                  :class="[
-                    'px-2 py-0.5 rounded text-[10px] font-medium border',
-                    act.status === 'Completed' || act.status === 'Submitted'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
-                      : 'bg-sky-50 text-sky-700 border-sky-200/60'
-                  ]"
-                >
-                  {{ act.status }}
-                </span>
-                <a
-                  v-if="act.link"
-                  :href="act.link"
-                  class="inline-flex items-center space-x-1 text-[10px] text-sky-600 hover:text-sky-800 font-medium"
-                >
-                  <span>Lihat</span>
-                  <ExternalLink :size="10" />
-                </a>
-              </div>
+            <div class="mt-1 text-xs text-slate-500">{{ trip.name }} · {{ trip.company }}</div>
+            <div class="flex flex-wrap justify-between gap-2 mt-2 text-xs">
+              <span :class="['px-2 py-0.5 rounded border', getMonitoringBadgeClass(trip.monitoring_status || trip.status)]">{{ trip.monitoring_status || trip.status }}</span>
+              <span>{{ trip.completed_stops }}/{{ trip.total_stops }} dikunjungi</span>
             </div>
-          </div>
-
-          <div v-if="activityLog.length === 0" class="text-center py-12 text-slate-400 text-xs">
-            Belum ada log pergerakan baru hari ini.
-          </div>
+            <div class="mt-2 text-xs text-slate-600">Checkpoint terakhir: {{ trip.last_checkpoint?.text || 'Belum tersedia' }}</div>
+            <div class="mt-2 text-xs font-medium text-sky-700">{{ selectedTripDetail?.name === trip.name ? 'Rute sedang ditampilkan' : 'Lihat Rute' }}</div>
+          </button>
+          <p v-if="!tripsList.length" class="py-6 text-center text-xs text-slate-500">{{ loading ? 'Memuat perjalanan...' : 'Tidak ada perjalanan sesuai filter.' }}</p>
         </div>
 
         <!-- Quick Action Footer -->
@@ -202,6 +174,24 @@
         </div>
       </div>
     </div>
+
+    <section class="order-last bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
+      <h3 class="font-semibold text-sm text-slate-900 mb-4 flex items-center gap-2"><Activity :size="16" />Aktivitas Terkini</h3>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <article v-for="(act, idx) in activityLog" :key="idx" class="rounded-lg border border-slate-100 bg-slate-50/70 p-3 text-xs flex gap-3">
+          <component :is="act.type === 'trip' ? RouteIcon : ShieldCheck" :size="14" class="shrink-0 text-slate-600 mt-1" />
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-slate-800">{{ act.title }}</div>
+            <p class="text-slate-500 mt-1">{{ act.description }}</p>
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+              <span>{{ act.time }}</span><span>{{ act.status }}</span>
+              <a v-if="act.link" :href="act.link" class="text-sky-600 hover:underline inline-flex items-center gap-1">Lihat <ExternalLink :size="10" /></a>
+            </div>
+          </div>
+        </article>
+      </div>
+      <p v-if="!activityLog.length" class="py-6 text-center text-xs text-slate-400">Belum ada log pergerakan baru hari ini.</p>
+    </section>
 
     <!-- Main Monitoring Table: Trip, Company, Driver, Plat Nomor, Jadwal, Berangkat Aktual, Progres, Checkpoint Terakhir, Status -->
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">

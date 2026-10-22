@@ -246,7 +246,7 @@ def submit_pod(
 # ==============================================================================
 
 @frappe.whitelist()
-def get_operations_summary():
+def get_operations_summary(company_filter=None):
 	"""KPIs, Real Map Points, and Recent Activity for Fleet Operations."""
 	today = getdate()
 
@@ -323,11 +323,14 @@ def get_operations_summary():
 		FROM `tabDelivery Trip` dt
 		WHERE dt.docstatus IN (0, 1)
 		AND dt.status IN ('Scheduled', 'In Transit')
+		AND (%(company)s IS NULL OR dt.company = %(company)s)
 		ORDER BY dt.modified DESC
 		LIMIT 15
-	""", as_dict=True)
+	""", {"company": company_filter or None}, as_dict=True)
 
 	for trip in active_trips:
+		if company_filter and trip.company != company_filter:
+			continue
 		# Company dispatch origin
 		if trip.company and trip.company not in companies_seen:
 			companies_seen.add(trip.company)
@@ -390,17 +393,20 @@ def get_operations_summary():
 
 	# B. Unassigned recent submitted notes
 	unassigned_notes = frappe.db.sql("""
-		SELECT dn.name, dn.customer, dn.customer_name, dn.shipping_address, dn.shipping_address_name,
+		SELECT dn.name, dn.company, dn.customer, dn.customer_name, dn.shipping_address, dn.shipping_address_name,
 		       dn.custom_delivery_method, dn.grand_total
 		FROM `tabDelivery Note` dn
 		WHERE dn.docstatus = 1
 		AND (dn.delivery_trip IS NULL OR dn.delivery_trip = '')
 		AND (dn.custom_pod_status IS NULL OR dn.custom_pod_status = 'Pending')
+		AND (%(company)s IS NULL OR dn.company = %(company)s)
 		ORDER BY dn.creation DESC
 		LIMIT 20
-	""", as_dict=True)
+	""", {"company": company_filter or None}, as_dict=True)
 
 	for note in unassigned_notes:
+		if company_filter and note.company != company_filter:
+			continue
 		c_coords = frappe.db.get_value("Customer", note["customer"], ["custom_latitude", "custom_longitude"], as_dict=True) or {}
 		c_lat = _clean_coord(c_coords.get("custom_latitude"))
 		c_lng = _clean_coord(c_coords.get("custom_longitude"))
@@ -425,6 +431,7 @@ def get_operations_summary():
 	activity_log = []
 	recent_trips = frappe.get_all(
 		"Delivery Trip",
+		filters={"company": company_filter} if company_filter else {},
 		fields=["name", "driver_name", "vehicle", "status", "modified"],
 		order_by="modified desc",
 		limit=5
@@ -446,6 +453,8 @@ def get_operations_summary():
 		limit=5
 	)
 	for p in recent_pods:
+		if company_filter and frappe.db.get_value("Delivery Note", p.delivery_note, "company") != company_filter:
+			continue
 		activity_log.append({
 			"type": "pod",
 			"title": f"POD: {p.delivery_note}",
@@ -455,12 +464,23 @@ def get_operations_summary():
 			"link": f"#/pod"
 		})
 
+	from delivery_app.services.monitoring_summary import fleet_kpis
+	fleet_counts = fleet_kpis(company_filter)
+	pending_notes = frappe.db.sql("""
+		SELECT COUNT(dn.name) FROM `tabDelivery Note` dn
+		WHERE dn.docstatus = 1 AND dn.status NOT IN ('Cancelled', 'Closed')
+		AND COALESCE(dn.custom_delivery_method, '') != 'Ekspedisi'
+		AND COALESCE(dn.custom_pod_status, '') != 'Delivered'
+		AND (%(company)s IS NULL OR dn.company = %(company)s)
+		AND NOT EXISTS (SELECT 1 FROM `tabDelivery Stop` ds
+			JOIN `tabDelivery Trip` dt ON dt.name = ds.parent
+			WHERE ds.delivery_note = dn.name AND dt.docstatus IN (0, 1))
+	""", {"company": company_filter or None})[0][0]
 	return {
 		"kpi": {
+			**fleet_counts,
 			"pending_orders": pending_notes,
 			"active_trips": active_trips_count,
-			"scheduled_trips": scheduled_trips_count,
-			"in_transit_trips": in_transit_trips_count,
 			"in_transit_couriers": in_transit_couriers,
 			"delivered_today": delivered_today,
 			"total_vehicles": total_vehicles,
@@ -918,7 +938,8 @@ def get_delivery_trips_list(status_filter=None, company_filter=None, search=None
 		params["company"] = company_filter
 
 	if status_filter and status_filter != "All":
-		conditions.append("dt.status = %(status)s")
+		from delivery_app.services.monitoring_summary import trip_status_sql
+		conditions.append(f"({trip_status_sql()}) = %(status)s")
 		params["status"] = status_filter
 
 	if search:
@@ -968,7 +989,7 @@ def get_delivery_trips_list(status_filter=None, company_filter=None, search=None
 				scan = scan_history.get(dn) if dn else None
 				if scan and scan.get("confirmed_at"):
 					conf_at = scan["confirmed_at"]
-					if not last_checkpoint or (last_checkpoint.get("confirmed_at") and conf_at > last_checkpoint["confirmed_at"]):
+					if not last_checkpoint or not last_checkpoint.get("confirmed_at") or conf_at > last_checkpoint["confirmed_at"]:
 						last_checkpoint = {
 							"customer": s["customer"],
 							"delivery_note": dn,
@@ -1014,7 +1035,7 @@ def get_delivery_trips_list(status_filter=None, company_filter=None, search=None
 
 
 @frappe.whitelist()
-def get_delivery_trip_detail(trip_name: str):
+def get_delivery_trip_detail(trip_name: str, include_route=1):
 	"""Detailed view of a Delivery Trip including full stop records, scan history, coordinates and PODs."""
 	trip = frappe.get_doc("Delivery Trip", trip_name)
 	trip_data = trip.as_dict()
@@ -1071,7 +1092,7 @@ def get_delivery_trip_detail(trip_name: str):
 				stop_dict["confirmation_status"] = "confirmed"
 				stop_dict["confirmation_text"] = f"Terkonfirmasi: {format_datetime(conf_at, 'HH:mm')}"
 
-				if not last_checkpoint or (last_checkpoint.get("confirmed_at") and conf_at > last_checkpoint["confirmed_at"]):
+				if not last_checkpoint or not last_checkpoint.get("confirmed_at") or conf_at > last_checkpoint["confirmed_at"]:
 					last_checkpoint = {
 						"customer": stop.customer,
 						"delivery_note": dn,
@@ -1155,7 +1176,8 @@ def get_delivery_trip_detail(trip_name: str):
 
 	# Attach OSRM Road Route
 	from delivery_app.services.osrm_routing import get_trip_osrm_route
-	trip_data["route"] = get_trip_osrm_route(trip.name)
+	if frappe.utils.cint(include_route):
+		trip_data["route"] = get_trip_osrm_route(trip.name)
 
 	return trip_data
 
@@ -1507,4 +1529,3 @@ def create_delivery_note_from_so(sales_order: str, delivery_method: str = "Armad
 		delivery_method=delivery_method,
 		custom_warehouse=custom_warehouse,
 	)
-

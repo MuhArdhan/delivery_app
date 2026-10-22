@@ -67,7 +67,7 @@ export async function callApi(method, args = {}, httpMethod = 'POST') {
 }
 
 export const DeliveryApi = {
-  getSummary: () => callApi('delivery_app.api.get_operations_summary', {}, 'GET'),
+  getSummary: (filters = {}) => callApi('delivery_app.api.get_operations_summary', filters, 'GET'),
   getNotes: (filters) => callApi('delivery_app.api.get_delivery_notes', filters, 'GET'),
   getNoteDetail: (name) => callApi('delivery_app.api.get_delivery_note_detail', { delivery_note: name }, 'GET'),
   dispatchEkspedisi: (payload) => callApi('delivery_app.api.dispatch_ekspedisi', payload, 'POST'),
@@ -76,7 +76,7 @@ export const DeliveryApi = {
   startTrip: (tripName) => callApi('delivery_app.api.start_trip', { trip_name: tripName }, 'POST'),
   completeTrip: (tripName, force = 0) => callApi('delivery_app.api.complete_trip', { trip_name: tripName, force }, 'POST'),
   getTrips: (filters) => callApi('delivery_app.api.get_delivery_trips_list', filters, 'GET'),
-  getTripDetail: (tripName) => callApi('delivery_app.api.get_delivery_trip_detail', { trip_name: tripName }, 'GET'),
+  getTripDetail: (tripName, includeRoute = true) => callApi('delivery_app.api.get_delivery_trip_detail', { trip_name: tripName, include_route: includeRoute ? 1 : 0 }, 'GET'),
   getFleetResources: () => callApi('delivery_app.api.get_fleet_resources', {}, 'GET'),
   getPods: (filters) => callApi('delivery_app.api.get_pods_list', filters, 'GET'),
   getSettings: () => callApi('delivery_app.api.get_gateway_settings_api', {}, 'GET'),

@@ -3,7 +3,7 @@
     <div ref="mapContainer" class="w-full h-full z-0"></div>
 
     <!-- Map Overlay Stats / Filter -->
-    <div class="absolute top-3 right-3 z-10 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-md border border-slate-700 text-xs text-slate-200 shadow-md flex items-center space-x-3">
+    <div class="absolute top-3 left-3 right-3 z-10 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-md border border-slate-700 text-xs text-slate-200 shadow-md flex flex-wrap items-center gap-2">
       <span class="flex items-center space-x-1.5">
         <span class="w-2.5 h-2.5 rounded bg-indigo-500"></span>
         <span>Asal</span>
@@ -81,6 +81,7 @@ const mapContainer = ref(null)
 let map = null
 let markerLayer = null
 let polylineLayer = null
+let previousBounds = ''
 
 function getMarkerColor(status, type) {
   if (type === 'origin') return '#6366f1' // indigo-500
@@ -212,9 +213,11 @@ function renderMarkersAndRoute() {
   }
 
   // 3. Fit Bounds
-  if (bounds.length > 0) {
+  const boundsKey = JSON.stringify(bounds)
+  if (bounds.length > 0 && boundsKey !== previousBounds) {
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 })
   }
+  previousBounds = boundsKey
 }
 
 function resetView() {

@@ -230,11 +230,18 @@ Nama aplikasi tetap **Delivery App**. Pilihan Ekspedisi tetap mudah diakses dari
 
 ### Tahap 4 - Penyederhanaan UI
 
-- [ ] Susun navigasi Dashboard, Pesanan, Perjalanan, dan Pengaturan.
-- [ ] Pertahankan pilihan/filter Armada Sendiri dan Ekspedisi pada Pesanan serta metode yang tersimpan pada DN existing.
-- [ ] Jadikan tabel trip sebagai pusat monitoring dengan panel detail dan peta rute terpilih.
-- [ ] Tambahkan pembaruan berkala, filter company/status, dan state kosong/error.
-- [ ] Rapikan label, ukuran teks, dan layout responsif sesuai pedoman minimalis.
+- [x] Susun navigasi Dashboard, Pesanan, Perjalanan, dan Pengaturan.
+- [x] Pertahankan pilihan/filter Armada Sendiri dan Ekspedisi pada Pesanan serta metode yang tersimpan pada DN existing.
+- [x] Jadikan tabel trip sebagai pusat monitoring dengan panel detail dan peta rute terpilih.
+- [x] Tambahkan pembaruan berkala, filter company/status, dan state kosong/error.
+- [x] Rapikan label, ukuran teks, dan layout responsif sesuai pedoman minimalis.
+
+Catatan implementasi tahap 4:
+- Pemilih trip ringkas menggantikan Aktivitas Terkini di samping peta; pada mobile pemilih tampil sebelum peta. Aktivitas dipindahkan setelah tabel perjalanan.
+- Filter company, status monitoring, pencarian, dan pagination berlaku pada daftar pemilih/tabel. Pengaturan menyediakan akses Armada/Pengemudi dan galeri POD tanpa menambah navigasi utama.
+- Dashboard/Perjalanan diperbarui setiap 30 detik saat tab terlihat, timer dibersihkan ketika keluar halaman. Refresh detail mempertahankan rute cache dan tidak memanggil OSRM; edit catatan tidak ditimpa refresh.
+- KPI terjadwal/dalam perjalanan mengikuti keberangkatan aktual dan visited, bukan status native saja. Selesai kunjungan hari ini memerlukan waktu scanner lengkap; tidak menggunakan modified/POD sebagai tanggal penyelesaian tebakan.
+- Verifikasi otomatis/build dan smoke test endpoint dilakukan; pemeriksaan visual interaktif desktop/mobile tetap menjadi bagian tahap 5.
 
 ### Tahap 5 - Verifikasi dan rilis
 

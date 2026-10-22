@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="bg-white rounded-xl p-5 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h2 class="text-sm font-semibold text-slate-900 tracking-tight">Perjalanan</h2>
+        <h2 class="text-sm font-semibold text-slate-900 tracking-tight">Rute Pengiriman (Delivery Trips)</h2>
         <p class="text-xs text-slate-500">Manajemen rute multi-drop armada sendiri, jadwal berangkat, dan monitoring progres checkpoint</p>
       </div>
       <div class="flex items-center space-x-2">
@@ -26,16 +26,8 @@
     </div>
 
     <!-- Status Filter & Search -->
-    <div v-if="error" role="alert" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ error }} <button @click="refreshTrips" class="underline">Coba lagi</button></div>
-    <div class="flex flex-wrap items-center gap-3 text-sm">
-      <select v-model="companyFilter" @change="currentPage = 1; refreshTrips()" aria-label="Filter company" class="max-w-full rounded-lg border border-slate-200 bg-white p-2">
-        <option value="">Semua company</option>
-        <option v-for="company in companies" :key="company.name" :value="company.name">{{ company.company_name || company.name }}</option>
-      </select>
-      <span class="text-xs text-slate-500">{{ updatedAt ? `Data diperbarui pukul ${updatedAt}` : 'Data belum dimuat' }} · otomatis 30 detik</span>
-    </div>
     <div class="bg-white rounded-xl p-4 border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-      <div class="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium text-slate-600">
+      <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs font-medium text-slate-600">
         <button
           v-for="tab in statusTabs"
           :key="tab.id"
@@ -52,7 +44,7 @@
       <div class="relative w-full md:w-72">
         <input
           v-model="searchQuery"
-          @keyup.enter="currentPage = 1; refreshTrips()"
+          @keyup.enter="refreshTrips"
           type="text"
           placeholder="Cari ID trip, driver, plat nomor..."
           class="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-slate-400 transition"
@@ -62,15 +54,13 @@
     </div>
 
     <!-- Empty State -->
-    <p v-if="loading || loadingDetail" role="status" class="text-sm text-slate-500">{{ loadingDetail ? 'Memuat detail perjalanan...' : 'Memperbarui perjalanan...' }}</p>
     <div v-if="!loading && trips.length === 0" class="bg-white rounded-xl border border-slate-200 p-12 text-center">
       <p class="text-sm font-medium text-slate-700">Tidak ada Delivery Trip ditemukan</p>
       <p class="text-xs text-slate-400 mt-1">Coba sesuaikan kata kunci pencarian atau buat trip pengiriman baru.</p>
     </div>
 
-    <TripMonitoringTable v-if="trips.length" class="hidden md:block" :trips="trips" @select="openTripDetail" @depart="confirmDeparture" />
-    <!-- Compact cards retain readability on small screens. -->
-    <div v-if="trips.length" class="grid grid-cols-1 md:hidden gap-4">
+    <!-- Trips Grid -->
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <div
         v-for="trip in trips"
         :key="trip.name"
@@ -144,7 +134,7 @@
               </span>
             </div>
             <div class="flex items-center justify-between" v-if="trip.next_planned_stop">
-              <span class="text-slate-400">Tujuan Berikutnya (rencana):</span>
+              <span class="text-slate-400">Tujuan Berikutnya:</span>
               <span class="font-medium text-sky-700 truncate max-w-[170px]">
                 {{ trip.next_planned_stop.customer }}
               </span>
@@ -211,11 +201,6 @@
     </div>
 
     <!-- Slide-over Drawer for Trip Details -->
-    <div class="flex items-center justify-end gap-3 text-sm">
-      <button :disabled="currentPage === 1 || loading" @click="currentPage--; refreshTrips()" class="disabled:opacity-40">Sebelumnya</button>
-      <span>{{ currentPage }} / {{ Math.max(1, Math.ceil(totalCount / 20)) }}</span>
-      <button :disabled="currentPage * 20 >= totalCount || loading" @click="currentPage++; refreshTrips()" class="disabled:opacity-40">Berikutnya</button>
-    </div>
     <div v-if="selectedTripDetail" class="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end">
       <div class="relative w-full max-w-2xl bg-white shadow-2xl flex flex-col h-full transform transition-all border-l border-slate-200">
         <!-- Drawer Header -->
@@ -234,7 +219,7 @@
             </div>
             <p class="text-xs text-slate-400 mt-0.5">Company: {{ selectedTripDetail.company }} | Rute Multi-Drop Armada Sendiri</p>
           </div>
-          <button @click="closeTripDetail" aria-label="Tutup detail perjalanan" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+          <button @click="selectedTripDetail = null" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
             <X :size="16" />
           </button>
         </div>
@@ -281,7 +266,7 @@
               </button>
             </div>
 
-            <div class="h-[420px] rounded-lg overflow-hidden border border-slate-200">
+            <div class="h-64 rounded-lg overflow-hidden border border-slate-200">
               <OperationsMap
                 :markers="drawerMapMarkers"
                 :route-polyline="selectedTripDetail.route?.route_points || []"
@@ -331,7 +316,7 @@
                       <div class="text-slate-500 text-[11px] mt-0.5">{{ stop.customer_address || '-' }}</div>
                       <div class="text-[11px] text-slate-400 mt-1 flex items-center space-x-2">
                         <span>DN: <strong class="text-slate-700 font-medium">{{ stop.delivery_note }}</strong></span>
-                        <span v-if="stop.has_coordinates" class="text-emerald-700 font-medium">({{ stop.lat }}, {{ stop.lng }})</span>
+                        <span v-if="stop.lat && stop.lng" class="text-emerald-700 font-medium">({{ stop.lat }}, {{ stop.lng }})</span>
                         <span v-else class="text-amber-600">Koordinat belum diatur</span>
                       </div>
                     </div>
@@ -493,10 +478,8 @@ import {
   Route
 } from 'lucide-vue-next'
 import { DeliveryApi } from '@/api'
-import { useVisibleRefresh } from '@/composables/useVisibleRefresh'
 import CreateTripModal from '@/components/CreateTripModal.vue'
 import OperationsMap from '@/components/OperationsMap.vue'
-import TripMonitoringTable from '@/components/TripMonitoringTable.vue'
 
 const loading = ref(false)
 const trips = ref([])
@@ -504,13 +487,6 @@ const totalCount = ref(0)
 const currentPage = ref(1)
 const currentTab = ref('All')
 const searchQuery = ref('')
-const companyFilter = ref('')
-const companies = ref([])
-const error = ref('')
-const updatedAt = ref('')
-const loadingDetail = ref(false)
-let detailVersion = 0
-let refreshQueued = false
 
 const driverList = ref([])
 const vehicleList = ref([])
@@ -552,7 +528,7 @@ const drawerMapMarkers = computed(() => {
   const markers = []
 
   // Origin marker
-  if (selectedTripDetail.value.has_origin_coordinates) {
+  if (selectedTripDetail.value.origin_lat && selectedTripDetail.value.origin_lng) {
     markers.push({
       id: `ORIGIN-${selectedTripDetail.value.company}`,
       type: 'origin',
@@ -567,7 +543,7 @@ const drawerMapMarkers = computed(() => {
 
   // Stop markers
   ;(selectedTripDetail.value.delivery_stops || []).forEach((stop) => {
-    if (stop.has_coordinates) {
+    if (stop.lat && stop.lng) {
       markers.push({
         id: stop.delivery_note || `${selectedTripDetail.value.name}-stop-${stop.idx}`,
         idx: stop.idx,
@@ -589,32 +565,20 @@ const drawerMapMarkers = computed(() => {
 })
 
 async function refreshTrips() {
-  if (loading.value) { refreshQueued = true; return }
   loading.value = true
-  error.value = ''
   try {
     const res = await DeliveryApi.getTrips({
       status_filter: currentTab.value === 'All' ? null : currentTab.value,
       search: searchQuery.value,
-      company_filter: companyFilter.value || null,
       page: currentPage.value,
       page_size: 20
     })
     trips.value = res.items || []
     totalCount.value = res.total_count || 0
-    if (selectedTripDetail.value && editingStopIdx.value === null && !savingStopDetails.value) {
-      const name = selectedTripDetail.value.name
-      const detail = await DeliveryApi.getTripDetail(name, false)
-      if (selectedTripDetail.value?.name === name && editingStopIdx.value === null && !savingStopDetails.value) {
-        selectedTripDetail.value = { ...detail, route: selectedTripDetail.value.route }
-      }
-    }
-    updatedAt.value = new Date().toLocaleTimeString('id-ID')
   } catch (err) {
-    error.value = err.message || 'Gagal memuat perjalanan. Data sebelumnya tetap ditampilkan.'
+    console.error('Failed to load trips:', err)
   } finally {
     loading.value = false
-    if (refreshQueued) { refreshQueued = false; refreshTrips() }
   }
 }
 
@@ -623,7 +587,6 @@ async function loadFleet() {
     const res = await DeliveryApi.getFleetResources()
     driverList.value = res.drivers || []
     vehicleList.value = res.vehicles || []
-    companies.value = res.companies || []
   } catch (e) {
     console.error('Fleet res err:', e)
   }
@@ -631,7 +594,6 @@ async function loadFleet() {
 
 function changeTab(tabId) {
   currentTab.value = tabId
-  currentPage.value = 1
   refreshTrips()
 }
 
@@ -640,36 +602,20 @@ function openNewTripModal() {
 }
 
 async function openTripDetail(trip) {
-  const version = ++detailVersion
-  loadingDetail.value = true
   try {
     const detail = await DeliveryApi.getTripDetail(trip.name)
-    if (version === detailVersion) {
-      selectedTripDetail.value = detail
-      editingStopIdx.value = null
-    }
+    selectedTripDetail.value = detail
   } catch (err) {
-    if (version === detailVersion) error.value = 'Gagal memuat detail trip: ' + err.message
-  } finally {
-    if (version === detailVersion) loadingDetail.value = false
+    alert('Gagal memuat detail trip: ' + err.message)
   }
-}
-
-function closeTripDetail() {
-  detailVersion++
-  loadingDetail.value = false
-  selectedTripDetail.value = null
-  editingStopIdx.value = null
 }
 
 async function reloadTripRoute() {
   if (!selectedTripDetail.value) return
-  const name = selectedTripDetail.value.name
-  const version = detailVersion
   loadingRoute.value = true
   try {
-    const res = await DeliveryApi.getTripRoute(name)
-    if (version === detailVersion && selectedTripDetail.value?.name === name) selectedTripDetail.value.route = res
+    const res = await DeliveryApi.getTripRoute(selectedTripDetail.value.name)
+    selectedTripDetail.value.route = res
   } catch (err) {
     alert('Gagal menghitung rute: ' + err.message)
   } finally {
@@ -749,7 +695,6 @@ async function handleCompleteTrip(trip) {
   }
 }
 
-useVisibleRefresh(refreshTrips)
 onMounted(() => {
   refreshTrips()
   loadFleet()

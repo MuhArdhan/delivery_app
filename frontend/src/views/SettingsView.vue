@@ -1,9 +1,5 @@
 <template>
   <div class="max-w-4xl space-y-6">
-    <div class="flex flex-wrap gap-3 text-sm">
-      <button class="text-sky-700 hover:underline" @click="$emit('nav', 'fleet')">Kelola armada dan pengemudi</button>
-      <button class="text-sky-700 hover:underline" @click="$emit('nav', 'pod')">Lihat bukti penerimaan (POD)</button>
-    </div>
     <!-- Header -->
     <div class="bg-white rounded-xl p-5 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
       <div>
@@ -277,7 +273,6 @@
 import { reactive, ref, onMounted } from 'vue'
 import { Zap, Save, Route, MapPin, Send, X } from 'lucide-vue-next'
 import { DeliveryApi, callApi } from '@/api'
-defineEmits(['nav'])
 
 const saving = ref(false)
 const testing = ref(false)

@@ -198,7 +198,7 @@
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div>
           <h3 class="font-semibold text-sm text-slate-900">Monitoring Perjalanan Armada Internal</h3>
-          <p class="text-xs text-slate-400">Pilih baris trip untuk memvisualisasikan rute rencana OSRM pada peta di atas</p>
+          <p class="text-xs text-slate-400">Buka detail trip untuk melihat informasi perjalanan dan daftar titik antar.</p>
         </div>
 
         <div class="flex items-center space-x-2">
@@ -245,9 +245,8 @@
             <tr
               v-for="trip in tripsList"
               :key="trip.name"
-              @click="handleSelectTripRow(trip)"
               :class="[
-                'cursor-pointer transition',
+                'transition',
                 selectedTripDetail?.name === trip.name ? 'bg-sky-50/80 font-medium' : 'hover:bg-slate-50/70'
               ]"
             >
@@ -302,15 +301,12 @@
                   >
                     Berangkat
                   </button>
-                  <button
-                    @click="handleSelectTripRow(trip)"
-                    :class="[
-                      'px-2 py-1 rounded text-[10px] font-medium border transition',
-                      selectedTripDetail?.name === trip.name ? 'bg-sky-600 text-white border-sky-600' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
-                    ]"
+                  <a
+                    :href="`#/trips/${encodeURIComponent(trip.name)}`"
+                    class="px-2 py-1 rounded text-[10px] font-medium border border-slate-200 hover:bg-slate-100 text-slate-700 transition whitespace-nowrap"
                   >
-                    {{ selectedTripDetail?.name === trip.name ? 'Aktif' : 'Lihat Rute' }}
-                  </button>
+                    Detail Trip
+                  </a>
                 </div>
               </td>
             </tr>

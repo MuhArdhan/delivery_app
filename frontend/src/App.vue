@@ -106,6 +106,7 @@
         <transition name="fade" mode="out-in">
           <component
             :is="activeComponent"
+            v-bind="currentView === 'trips' ? { initialTripName: routeTripName } : {}"
             @nav="navigate"
             @open-note="handleOpenNoteFromDashboard"
           />
@@ -139,6 +140,7 @@ import SettingsView from '@/views/SettingsView.vue'
 import { DeliveryApi } from '@/api'
 
 const currentView = ref('dashboard')
+const routeTripName = ref('')
 const userName = ref(window.workspace_user || 'Operator')
 const pendingCount = ref(0)
 
@@ -169,6 +171,7 @@ const activeComponent = computed(() => {
 })
 
 function navigate(viewId) {
+  routeTripName.value = ''
   currentView.value = viewId
   window.location.hash = `#/${viewId}`
 }
@@ -180,6 +183,16 @@ function handleOpenNoteFromDashboard(noteId) {
 
 function syncFromHash() {
   const hash = window.location.hash.replace(/^#\/?/, '')
+  if (hash.startsWith('trips/')) {
+    try {
+      routeTripName.value = decodeURIComponent(hash.slice('trips/'.length))
+      currentView.value = 'trips'
+    } catch {
+      routeTripName.value = ''
+    }
+    return
+  }
+  routeTripName.value = ''
   if (['dashboard', 'notes', 'trips', 'pod', 'fleet', 'settings'].includes(hash)) {
     currentView.value = hash
   }

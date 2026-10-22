@@ -463,7 +463,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   RefreshCw,
   Plus,
@@ -480,6 +480,10 @@ import {
 import { DeliveryApi } from '@/api'
 import CreateTripModal from '@/components/CreateTripModal.vue'
 import OperationsMap from '@/components/OperationsMap.vue'
+
+const props = defineProps({
+  initialTripName: { type: String, default: '' }
+})
 
 const loading = ref(false)
 const trips = ref([])
@@ -694,6 +698,10 @@ async function handleCompleteTrip(trip) {
     alert(err.message || 'Gagal menyelesaikan trip')
   }
 }
+
+watch(() => props.initialTripName, (name) => {
+  if (name) openTripDetail({ name })
+}, { immediate: true })
 
 onMounted(() => {
   refreshTrips()

@@ -59,6 +59,7 @@
 <script setup>
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import L from 'leaflet'
+import { trackingMethodLabel } from '@/utils/tracking'
 
 const props = defineProps({
   markers: {
@@ -168,7 +169,7 @@ function renderMarkersAndRoute() {
         <div style="font-weight: 600; color: #334155; margin-bottom: 3px;">${m.customer || 'Pelanggan'}</div>
         <div style="color: #64748b; font-size: 11px; line-height: 1.3; margin-bottom: 8px;">${m.address || '-'}</div>
         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 6px;">
-          <span style="font-size: 10px; color: #64748b;">${m.method || 'Armada Sendiri'}</span>
+          <span style="font-size: 10px; color: #64748b;">${trackingMethodLabel(m.method)}</span>
           <button id="btn-popup-${m.id}" style="background: #0284c7; color: white; border: none; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;">
             Detail
           </button>

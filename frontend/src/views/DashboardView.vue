@@ -11,7 +11,7 @@
           </span>
           <span class="text-[11px] text-amber-600 font-medium mt-1 inline-flex items-center space-x-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            <span>DN Armada Sendiri</span>
+            <span>Menunggu penjadwalan</span>
           </span>
         </div>
         <div class="w-11 h-11 rounded-lg bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600">
@@ -197,7 +197,7 @@
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div>
-          <h3 class="font-semibold text-sm text-slate-900">Monitoring Perjalanan Armada Internal</h3>
+          <h3 class="font-semibold text-sm text-slate-900">Monitoring Perjalanan</h3>
           <p class="text-xs text-slate-400">Buka detail trip untuk melihat informasi perjalanan dan daftar titik antar.</p>
         </div>
 

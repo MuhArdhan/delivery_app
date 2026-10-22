@@ -35,7 +35,7 @@ def validate_delivery_trip(doc, method=None):
 			frappe.throw(
 				_(
 					"Delivery Note <b>{0}</b> diatur untuk metode pengiriman <b>Ekspedisi</b> (3PL). "
-					"Dokumen ini tidak dapat dijadwalkan ke Armada Sendiri (Delivery Trip)."
+					"Dokumen ini tidak dapat dijadwalkan ke trip dengan checkpoint scanner."
 				).format(stop.delivery_note),
 				title=_("Metode Pengiriman Tidak Sesuai")
 			)
@@ -88,4 +88,3 @@ def validate_delivery_trip(doc, method=None):
 			if c_lat is not None and c_lng is not None:
 				stop.lat = c_lat
 				stop.lng = c_lng
-

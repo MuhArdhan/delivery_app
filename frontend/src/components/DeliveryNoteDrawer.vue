@@ -18,7 +18,7 @@
                     : 'bg-sky-500/10 text-sky-300 border-sky-500/30'
                 ]"
               >
-                {{ note?.custom_delivery_method || 'Armada Sendiri' }}
+                {{ trackingMethodLabel(note?.custom_delivery_method) }}
               </span>
             </div>
             <h2 class="text-base font-semibold tracking-tight mt-1">{{ note?.name }}</h2>
@@ -134,7 +134,7 @@
           <div v-else class="space-y-3">
             <h4 class="font-semibold text-slate-900 uppercase tracking-wider text-[10px] flex items-center space-x-1.5">
               <Truck :size="13" class="text-slate-500" />
-              <span>Alur Armada Sendiri & Rute</span>
+              <span>Checkpoint & Rute Pengiriman</span>
             </h4>
             <div v-if="note?.trip" class="p-4 rounded-lg border border-slate-200 bg-slate-50/50 space-y-2">
               <div class="flex justify-between items-center">
@@ -201,6 +201,7 @@
 
 <script setup>
 import { X, User, Phone, Package, Send, Truck, ShieldCheck, ExternalLink } from 'lucide-vue-next'
+import { trackingMethodLabel } from '@/utils/tracking'
 
 const props = defineProps({
   isOpen: Boolean,

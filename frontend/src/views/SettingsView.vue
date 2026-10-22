@@ -4,7 +4,7 @@
     <div class="bg-white rounded-xl p-5 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
       <div>
         <h2 class="text-sm font-semibold text-slate-900 tracking-tight">Pengaturan Operasional & Layanan Rute</h2>
-        <p class="text-xs text-slate-500">Konfigurasi OSRM routing, koordinat asal company armada sendiri, dan gateway kurir ekspedisi</p>
+        <p class="text-xs text-slate-500">Konfigurasi rute, koordinat asal company, dan layanan tracking ekspedisi</p>
       </div>
     </div>
 
@@ -51,7 +51,7 @@
           <MapPin :size="15" />
         </div>
         <div>
-          <span class="font-semibold text-slate-900 text-sm block">Lokasi Asal Keberangkatan Company (Armada Internal)</span>
+          <span class="font-semibold text-slate-900 text-sm block">Lokasi Asal Keberangkatan Company</span>
           <span class="text-slate-500 text-[11px]">Titik awal pengantaran untuk setiap Delivery Trip per entitas Company</span>
         </div>
       </div>

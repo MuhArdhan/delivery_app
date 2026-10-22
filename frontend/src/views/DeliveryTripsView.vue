@@ -4,7 +4,7 @@
     <div class="bg-white rounded-xl p-5 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <h2 class="text-sm font-semibold text-slate-900 tracking-tight">Rute Pengiriman (Delivery Trips)</h2>
-        <p class="text-xs text-slate-500">Manajemen rute multi-drop armada sendiri, jadwal berangkat, dan monitoring progres checkpoint</p>
+        <p class="text-xs text-slate-500">Manajemen rute multi-drop, jadwal berangkat, dan monitoring checkpoint pengiriman</p>
       </div>
       <div class="flex items-center space-x-2">
         <button
@@ -217,7 +217,7 @@
                 {{ selectedTripDetail.monitoring_status || selectedTripDetail.status }}
               </span>
             </div>
-            <p class="text-xs text-slate-400 mt-0.5">Company: {{ selectedTripDetail.company }} | Rute Multi-Drop Armada Sendiri</p>
+            <p class="text-xs text-slate-400 mt-0.5">Company: {{ selectedTripDetail.company }} | Rute Multi-Drop</p>
           </div>
           <button @click="selectedTripDetail = null" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
             <X :size="16" />

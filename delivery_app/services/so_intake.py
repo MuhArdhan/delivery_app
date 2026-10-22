@@ -254,7 +254,7 @@ def create_delivery_note_from_so(sales_order: str, delivery_method: str = "Armad
 
 	clean_method = (delivery_method or "Armada Sendiri").strip()
 	if clean_method not in ["Armada Sendiri", "Ekspedisi"]:
-		frappe.throw(_("Metode pengiriman tidak valid. Pilih 'Armada Sendiri' atau 'Ekspedisi'."))
+		frappe.throw(_("Metode tracking tidak valid. Pilih Checkpoint Scanner atau Resi Ekspedisi."))
 
 	so_locked = frappe.db.sql("""
 		SELECT name, docstatus, status, per_delivered, company

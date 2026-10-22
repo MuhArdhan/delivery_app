@@ -4,7 +4,7 @@
     <div class="bg-white rounded-xl p-5 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <h2 class="text-sm font-semibold text-slate-900 tracking-tight">Armada & Pengemudi (Fleet Resources)</h2>
-        <p class="text-xs text-slate-500">Daftar kendaraan operasional dan pengemudi internal yang terdaftar di ERPNext</p>
+        <p class="text-xs text-slate-500">Daftar kendaraan dan pengemudi yang terdaftar di ERPNext</p>
       </div>
       <div class="flex items-center space-x-2">
         <a

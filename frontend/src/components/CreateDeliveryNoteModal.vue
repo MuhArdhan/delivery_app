@@ -146,7 +146,7 @@
         <!-- Delivery Method Selector -->
         <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
           <label class="block font-semibold text-slate-900 text-xs">
-            Metode Pengiriman:
+            Metode Tracking:
           </label>
           <div class="grid grid-cols-2 gap-3">
             <label
@@ -166,10 +166,10 @@
               <div>
                 <div class="font-semibold text-slate-900 flex items-center space-x-1.5">
                   <Truck :size="13" class="text-sky-600" />
-                  <span>Armada Sendiri</span>
+                  <span>Checkpoint Scanner</span>
                 </div>
                 <div class="text-[11px] text-slate-500 mt-0.5">
-                  Dijadwalkan ke rute multi-drop Delivery Trip internal
+                  Progres kunjungan dicatat melalui scanner pada Delivery Trip
                 </div>
               </div>
             </label>
@@ -191,7 +191,7 @@
               <div>
                 <div class="font-semibold text-slate-900 flex items-center space-x-1.5">
                   <Send :size="13" class="text-indigo-600" />
-                  <span>Ekspedisi (3PL)</span>
+                  <span>Resi Ekspedisi</span>
                 </div>
                 <div class="text-[11px] text-slate-500 mt-0.5">
                   Kirim lewat kurir logistik pihak ketiga (JNE, SiCepat, dll.)

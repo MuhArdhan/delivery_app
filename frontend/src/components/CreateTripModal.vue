@@ -8,7 +8,7 @@
             <Route :size="15" class="text-sky-400" />
           </div>
           <div>
-            <h3 class="font-semibold text-sm text-white">Buat Delivery Trip (Armada Sendiri)</h3>
+            <h3 class="font-semibold text-sm text-white">Buat Delivery Trip</h3>
             <p class="text-xs text-slate-400">Rute Multi-Drop & Penugasan Pengemudi</p>
           </div>
         </div>

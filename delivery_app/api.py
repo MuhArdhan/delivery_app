@@ -784,7 +784,7 @@ def create_delivery_trip(driver: str, vehicle: str, departure_time: str = None, 
 			dn_info = frappe.db.get_value("Delivery Note", dn_name, ["custom_delivery_method", "company"], as_dict=True)
 			if dn_info:
 				if dn_info.custom_delivery_method == "Ekspedisi":
-					frappe.throw(_("Delivery Note {0} diatur untuk Ekspedisi (3PL). Tidak dapat dimasukkan ke Armada Sendiri.").format(dn_name))
+					frappe.throw(_("Delivery Note {0} menggunakan tracking resi ekspedisi dan tidak dapat dijadwalkan ke trip dengan checkpoint scanner.").format(dn_name))
 				if dn_info.company:
 					dn_companies.add(dn_info.company)
 

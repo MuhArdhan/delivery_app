@@ -1,10 +1,12 @@
-# Plan: Delivery App - Monitoring Pengiriman Armada Sendiri
+# Plan: Delivery App - Monitoring Pengiriman
 
 Status: rencana berdasarkan diskusi pengguna; implementasi dilakukan pada tahap berikutnya.
 
 ## 1. Tujuan
 
-Delivery App menjadi tempat kerja sederhana untuk memproses pengiriman dari Sales Order dengan pilihan Armada Sendiri atau Ekspedisi. Prioritas pengembangan saat ini adalah monitoring armada sendiri; rincian alur ekspedisi masih belum final. ERPNext menjadi sumber dokumen dan validasi transaksi.
+Delivery App menjadi tempat kerja sederhana untuk memproses pengiriman dari Sales Order. Pengiriman merupakan alur yang sama; perbedaannya adalah metode tracking: **Checkpoint Scanner** atau **Resi Ekspedisi**, bukan kepemilikan kendaraan. ERPNext menjadi sumber dokumen dan validasi transaksi.
+
+Terminologi UI diperbarui tanpa migrasi data: nilai legacy `Armada Sendiri` ditampilkan sebagai `Checkpoint Scanner`, dan `Ekspedisi` sebagai `Resi Ekspedisi`. Referensi teknis legacy pada bagian berikut tetap mengacu pada nilai tersimpan tersebut.
 
 Informasi utama yang harus cepat ditemukan: driver, nomor telepon, plat nomor, company, jadwal keberangkatan, keberangkatan aktual, SO/DN yang dibawa, progres kunjungan, dan checkpoint terakhir yang terkonfirmasi.
 
@@ -12,8 +14,8 @@ Informasi utama yang harus cepat ditemukan: driver, nomor telepon, plat nomor, c
 
 | Topik | Keputusan |
 | --- | --- |
-| Fokus | Prioritas monitoring armada sendiri. Rincian ekspedisi dan resi dibahas pada tahap lanjutan. |
-| Metode pengiriman | Pilihan Armada Sendiri dan Ekspedisi tetap tersedia di app. Alur ekspedisi belum final. |
+| Fokus | Monitoring pengiriman; prioritas implementasi tracking checkpoint. Rincian integrasi resi dibahas pada tahap lanjutan. |
+| Metode tracking | Checkpoint Scanner dan Resi Ekspedisi. Nilai database existing dipertahankan agar kompatibel. |
 | Sumber pesanan | Sales Order yang sudah diterima/disubmit di ERPNext. |
 | Hubungan dokumen | Satu SO menjadi satu DN dengan seluruh barang yang harus dikirim. |
 | Pengiriman parsial | Alur app menggunakan pengiriman penuh. Jika barang belum siap, petugas menunggu. |

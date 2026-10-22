@@ -267,7 +267,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 class="text-sm font-semibold text-slate-900 tracking-tight">Daftar Pengiriman (Delivery Notes)</h2>
-            <p class="text-xs text-slate-500">Kelola dan jadwalkan pengiriman ke kurir 3PL atau armada multi-drop internal</p>
+            <p class="text-xs text-slate-500">Kelola pengiriman dan pantau progres melalui checkpoint scanner atau resi ekspedisi</p>
           </div>
           <div class="flex items-center space-x-2">
             <button
@@ -313,9 +313,9 @@
               @change="refreshNotes"
               class="text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:border-slate-400"
             >
-              <option value="All">Semua Metode</option>
-              <option value="Armada Sendiri">Armada Sendiri</option>
-              <option value="Ekspedisi">Ekspedisi (3PL)</option>
+              <option value="All">Semua Metode Tracking</option>
+              <option value="Armada Sendiri">Checkpoint Scanner</option>
+              <option value="Ekspedisi">Resi Ekspedisi</option>
             </select>
 
             <div class="relative w-full md:w-64">
@@ -377,7 +377,7 @@
                 <th class="p-3.5">Dokumen / Tanggal</th>
                 <th class="p-3.5">Tujuan & Pelanggan</th>
                 <th class="p-3.5">Barang & Nilai</th>
-                <th class="p-3.5">Metode Kirim</th>
+                <th class="p-3.5">Metode Tracking</th>
                 <th class="p-3.5">Status Pelacakan / Trip</th>
                 <th class="p-3.5 text-right">Aksi Dispatch</th>
               </tr>
@@ -457,7 +457,7 @@
                     ]"
                   >
                     <component :is="note.custom_delivery_method === 'Ekspedisi' ? Send : Truck" :size="12" />
-                    <span>{{ note.custom_delivery_method || 'Armada Sendiri' }}</span>
+                    <span>{{ trackingMethodLabel(note.custom_delivery_method) }}</span>
                   </span>
                 </td>
 
@@ -662,6 +662,7 @@ import { DeliveryApi } from '@/api'
 import CreateDeliveryNoteModal from '@/components/CreateDeliveryNoteModal.vue'
 import DispatchEkspedisiModal from '@/components/DispatchEkspedisiModal.vue'
 import CreateTripModal from '@/components/CreateTripModal.vue'
+import { trackingMethodLabel } from '@/utils/tracking'
 import TrackingTimelineModal from '@/components/TrackingTimelineModal.vue'
 import PodDetailModal from '@/components/PodDetailModal.vue'
 import DeliveryNoteDrawer from '@/components/DeliveryNoteDrawer.vue'
